@@ -1,0 +1,23 @@
+{
+  "name": "gaming-universe",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Gaming Universe platform backend",
+  "main": "backend/server.js",
+  "scripts": {
+    "dev": "node --watch backend/server.js",
+    "start": "node backend/server.js"
+  },
+  "dependencies": {
+    "argon2": "^0.45.1",
+    "connect-mongo": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.6.2",
+    "express-session": "^1.19.0",
+    "helmet": "^8.0.0",
+    "mongoose": "^8.9.5",
+    "socket.io": "^4.8.3"
+  }
+}

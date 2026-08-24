@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8" />
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    />
+
+    <meta
+        name="description"
+        content="Gaming Universe — enter a new world of browser gaming."
+    />
+
+    <title>Gaming Universe</title>
+
+    <link
+        rel="stylesheet"
+        href="./css/main.css"
+    />
+
+</head>
+
+
+<body>
+
+    <div id="app">
+
+
+        <!-- =================================================
+             LIQUID GLASS NAVIGATION
+             ================================================= -->
+
+        <header class="main-navigation">
+
+
+            <!-- BRAND -->
+
+            <a
+                href="#"
+                class="brand"
+                aria-label="Gaming Universe Home"
+            >
+
+                <span
+                    class="brand-controller"
+                    aria-hidden="true"
+                >
+
+                    <span class="controller-body">
+
+                        <span
+                            class="controller-stick controller-stick-left"
+                        ></span>
+
+                        <span
+                            class="controller-stick controller-stick-right"
+                        ></span>
+
+
+                        <span class="controller-dpad"></span>
+
+
+                        <span class="controller-buttons">
+
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                            <span></span>
+
+                        </span>
+
+                    </span>
+
+                </span>
+
+
+                <span class="brand-name">
+
+                    GAMING
+
+                    <strong>
+                        UNIVERSE
+                    </strong>
+
+                </span>
+
+            </a>
+
+
+            <div class="navigation-search" role="search">
+                <input id="game-search" type="search" placeholder="SEARCH GAMES" autocomplete="off" aria-label="Search games">
+                <div id="game-search-results" class="game-search-results" hidden></div>
+            </div>
+
+
+            <!-- =================================================
+                 PRIMARY NAVIGATION
+                 ================================================= -->
+
+            <nav
+                class="navigation-links"
+                aria-label="Main Navigation"
+            >
+
+                <a
+                    href="#"
+                    class="navigation-link active"
+                    aria-current="page"
+                >
+                    HOME
+                </a>
+
+
+                <a
+                    href="#"
+                    class="navigation-link"
+                >
+                    DISCOVER
+                </a>
+
+
+                <a
+                    href="#"
+                    class="navigation-link"
+                >
+                    LIVE
+                </a>
+
+            </nav>
+
+
+            <!-- =================================================
+                 PLAYER
+                 ================================================= -->
+
+            <div class="navigation-player" id="player-menu-button" role="button" tabindex="0" aria-label="Open account panel">
+
+                <span
+                    class="player-status"
+                    aria-hidden="true"
+                ></span>
+
+                <span class="player-name">
+                    GUEST
+                </span>
+
+            </div>
+
+
+        </header>
+
+        <main class="platform-stage">
+
+            <section
+                class="game-portal"
+                aria-labelledby="game-title"
+            >
+
+                <div class="game-portal-header">
+
+                    <div>
+                        <span class="game-kicker">GAME #001 / LIVE BUILD</span>
+
+                        <h1 id="game-title">
+                            TIC TAC <span>TOE</span>
+                        </h1>
+
+                        <p class="game-introduction">
+                            Read the grid. Hold the line. Make your move.
+                        </p>
+                    </div>
+
+                    <div class="game-account-summary" aria-live="polite">
+                        <span class="game-account-label">PLAYER XP</span>
+                        <strong id="game-account-xp">GUEST</strong>
+                    </div>
+
+                </div>
+
+
+                <div class="game-mode-picker" aria-label="Game modes">
+
+                    <button
+                        class="game-mode-button active"
+                        type="button"
+                        data-game-mode="computer"
+                    >
+                        <span class="mode-index">01</span>
+                        <span>
+                            <strong>PLAY VS COMPUTER</strong>
+                            <small>MINIMAX CORE / SOLO MATCH</small>
+                        </span>
+                    </button>
+
+                    <button
+                        class="game-mode-button"
+                        type="button"
+                        data-game-mode="player"
+                    >
+                        <span class="mode-index">02</span>
+                        <span>
+                            <strong>PLAY VS PLAYER</strong>
+                            <small>LIVE QUEUE / AUTHENTICATED</small>
+                        </span>
+                    </button>
+
+                </div>
+
+
+                <div class="game-status-bar">
+
+                    <span class="game-status-light" aria-hidden="true"></span>
+
+                    <span id="game-status" aria-live="polite">
+                        Sign in to enter the arena.
+                    </span>
+
+                    <button
+                        class="game-exit-button"
+                        type="button"
+                        id="game-exit-button"
+                    >
+                        RESET GAME
+                    </button>
+
+                </div>
+
+                <div class="game-start-toast" id="game-start-toast" role="status" aria-live="polite" hidden>MATCH STARTED</div>
+
+
+                <div class="game-arena">
+
+                    <aside class="game-player-rail" aria-label="Match players">
+
+                        <div class="game-player-card active" id="game-player-card">
+                            <span class="player-card-symbol">X</span>
+                            <span class="player-card-copy">
+                                <small>YOU</small>
+                                <strong id="game-player-name">GUEST</strong>
+                            </span>
+                        </div>
+
+                        <div class="game-player-card" id="game-opponent-card">
+                            <span class="player-card-symbol">O</span>
+                            <span class="player-card-copy">
+                                <small>OPPONENT</small>
+                                <strong id="game-opponent-name">COMPUTER</strong>
+                            </span>
+                        </div>
+
+                    </aside>
+
+
+                    <div class="board-frame">
+
+                        <div
+                            class="tic-tac-toe-board"
+                            id="tic-tac-toe-board"
+                            role="grid"
+                            aria-label="Tic Tac Toe board"
+                        >
+
+                            <button class="board-cell" type="button" role="gridcell" data-cell="0" aria-label="Row 1, column 1"></button>
+                            <button class="board-cell" type="button" role="gridcell" data-cell="1" aria-label="Row 1, column 2"></button>
+                            <button class="board-cell" type="button" role="gridcell" data-cell="2" aria-label="Row 1, column 3"></button>
+                            <button class="board-cell" type="button" role="gridcell" data-cell="3" aria-label="Row 2, column 1"></button>
+                            <button class="board-cell" type="button" role="gridcell" data-cell="4" aria-label="Row 2, column 2"></button>
+                            <button class="board-cell" type="button" role="gridcell" data-cell="5" aria-label="Row 2, column 3"></button>
+                            <button class="board-cell" type="button" role="gridcell" data-cell="6" aria-label="Row 3, column 1"></button>
+                            <button class="board-cell" type="button" role="gridcell" data-cell="7" aria-label="Row 3, column 2"></button>
+                            <button class="board-cell" type="button" role="gridcell" data-cell="8" aria-label="Row 3, column 3"></button>
+
+                        </div>
+
+                    </div>
+
+
+                    <aside class="game-command-rail">
+
+                        <div class="turn-display">
+                            <span class="turn-display-label">CURRENT TURN</span>
+                            <strong id="game-turn">—</strong>
+                        </div>
+
+                        <div class="game-command-copy" id="game-command-copy">
+                            Choose a mode to initialize a match.
+                        </div>
+
+                        <button
+                            class="game-action-button"
+                            type="button"
+                            id="game-primary-action"
+                        >
+                            START MATCH
+                        </button>
+
+                    </aside>
+
+                </div>
+
+
+                <section
+                    class="game-result-panel"
+                    id="game-result-panel"
+                    aria-live="polite"
+                    hidden
+                >
+                    <button class="game-result-close" type="button" id="game-result-close" aria-label="Close result">×</button>
+                    <span class="result-kicker" id="game-result-kicker">MATCH COMPLETE</span>
+                    <h2 id="game-result-title">VICTORY</h2>
+                    <p id="game-result-copy"></p>
+                    <div class="result-actions">
+                        <button class="game-action-button" type="button" id="game-replay-button">PLAY AGAIN</button>
+                        <button class="game-secondary-button" type="button" id="game-new-player-button">PLAY OTHER GAME</button>
+                    </div>
+                </section>
+
+            </section>
+
+        </main>
+
+
+        <div
+            class="auth-overlay"
+            id="auth-overlay"
+            aria-hidden="true"
+            hidden
+        >
+
+            <section
+                class="auth-panel"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="auth-title"
+            >
+
+                <button
+                    class="auth-close-button"
+                    id="auth-close-button"
+                    type="button"
+                    aria-label="Close account panel"
+                >
+                    ×
+                </button>
+
+                <span class="auth-kicker">GAMING UNIVERSE IDENTITY</span>
+                <h2 id="auth-title">ENTER THE <span>UNIVERSE</span></h2>
+                <p class="auth-message" id="auth-message" aria-live="polite"></p>
+
+                <div id="auth-view"></div>
+
+                <div class="auth-navigation" id="auth-navigation">
+                    <button type="button" data-auth-switch="login">LOGIN</button>
+                    <button type="button" data-auth-switch="signup">CREATE ACCOUNT</button>
+                    <button type="button" data-auth-switch="forgot">RESET PASSWORD</button>
+                </div>
+
+            </section>
+
+        </div>
+
+
+    </div>
+
+
+    <!-- =====================================================
+         JAVASCRIPT
+         ===================================================== -->
+
+    <script src="http://localhost:5051/socket.io/socket.io.js"></script>
+    <script src="./js/main.js?v=5051-ui-15"></script>
+
+</body>
+
+</html>

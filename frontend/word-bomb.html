@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Word Bomb — Gaming Universe</title>
+  <link rel="stylesheet" href="./css/main.css"><link rel="stylesheet" href="./css/word-bomb.css">
+</head>
+<body class="word-bomb-page">
+  <header class="main-navigation">
+    <a href="./index.html" class="brand" aria-label="Gaming Universe Home"><span class="brand-controller" aria-hidden="true"><span class="controller-body"><span class="controller-stick controller-stick-left"></span><span class="controller-stick controller-stick-right"></span><span class="controller-dpad"></span><span class="controller-buttons"><span></span><span></span><span></span><span></span></span></span></span><span class="brand-name">GAMING <strong>UNIVERSE</strong></span></a>
+    <div class="navigation-search" role="search"><input id="game-search" type="search" placeholder="SEARCH GAMES" autocomplete="off" aria-label="Search games"><div id="game-search-results" class="game-search-results" hidden></div></div>
+    <nav class="navigation-links" aria-label="Main Navigation"><a href="./index.html" class="navigation-link active">HOME</a><a href="./index.html" class="navigation-link">DISCOVER</a><a href="#" class="navigation-link">LIVE</a></nav>
+    <div class="navigation-player" id="player-menu-button" role="button" tabindex="0" aria-label="Open account panel"><span class="player-status"></span><span class="player-name" id="word-bomb-identity">GUEST</span></div>
+  </header>
+  <main class="word-bomb-shell">
+    <div class="word-bomb-heading"><div><span class="game-kicker">GAME #002 / LIVE BUILD</span><h1>WORD <span>BOMB</span></h1><p>Find the sequence. Keep the core alive.</p></div><a href="./index.html" class="game-home-button">← BACK TO GAMES</a></div>
+    <section class="word-bomb-layout">
+      <aside class="word-bomb-control glass-panel"><span class="game-kicker">MATCH CONTROL</span><h2>ENTER THE <span>ARENA</span></h2><p id="word-bomb-message" aria-live="polite">Build a streak or enter a live room.</p><div class="word-bomb-actions"><button id="word-bomb-quick" class="game-action-button">SOLO STREAK</button><button id="word-bomb-live" class="game-secondary-button">LIVE MATCH</button><button id="word-bomb-create" class="game-secondary-button">CREATE ROOM</button></div><label class="room-join">ROOM CODE<input id="word-bomb-code" maxlength="6" placeholder="ABC123" autocomplete="off"><button id="word-bomb-join" class="game-secondary-button" type="button">JOIN ROOM</button></label><div id="word-bomb-lobby" hidden><span class="game-kicker">PLAYERS</span><ul id="word-bomb-players"></ul><button id="word-bomb-start" class="game-action-button" hidden>START MATCH</button></div><div class="word-bomb-rules"><span>3 LIVES</span><span>20 SECOND TURNS</span><span>A–Z BONUS LIFE</span></div></aside>
+      <section class="word-bomb-arena glass-panel" id="word-bomb-arena"><div class="player-orbit" id="word-bomb-orbit"></div><div class="turn-arrow" id="word-bomb-turn-arrow" aria-hidden="true">➤</div><div class="bomb-core"><span class="bomb-label">ACTIVE SEQUENCE</span><strong id="word-bomb-sequence">—</strong><div class="bomb-timer"><span id="word-bomb-timer">20.0</span><small>SEC</small></div></div><div class="word-bomb-turn" id="word-bomb-turn">Choose a mode to begin.</div><form id="word-bomb-form" class="word-bomb-form"><input id="word-bomb-input" required minlength="3" autocomplete="off" placeholder="TYPE A WORD" aria-label="Word"><button class="game-action-button" type="submit">SUBMIT</button></form><div id="word-bomb-feed" class="word-bomb-feed" aria-live="polite"></div><aside class="used-words-panel"><span class="game-kicker">WORDS USED</span><ol id="word-bomb-used-words"></ol></aside></section>
+    </section>
+  </main>
+  <script src="http://localhost:5051/socket.io/socket.io.js"></script><script src="./js/word-bomb.js?v=5051-wordbomb-1"></script>
+</body>
+</html>
