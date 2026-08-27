@@ -1,6 +1,7 @@
 const http = require("http");
 const path = require("path");
 
+
 require("dotenv").config({
     path: path.resolve(__dirname, "../.env")
 });
@@ -102,23 +103,10 @@ const startServer = async () => {
         httpServer.listen(port, () => {
             console.log("Gaming Universe API listening on port " + port + ".");
         });
-    } catch (error) {
-        if (
-            error &&
-            (
-                error.message === "MONGODB_URI is not configured." ||
-                error.message ===
-                    "MONGODB_URI is invalid. URL-encode special characters in credentials." ||
-                error.message === "SESSION_SECRET is not configured."
-            )
-        ) {
-            console.error(error.message);
-        } else {
-            console.error("MongoDB connection failed. API server was not started.");
-        }
-
-        process.exitCode = 1;
-    }
+} catch (error) {
+    console.error("API startup failed:", error);
+    process.exitCode = 1;
+}
 };
 
 if (require.main === module) {
