@@ -1,6 +1,10 @@
 "use strict";
 
 document.addEventListener("DOMContentLoaded", () => {
+    if (new URLSearchParams(window.location.search).get("game") === "timeline") {
+        window.location.replace("./timeline.html");
+        return;
+    }
     const browserHost = window.location.hostname;
     const localApiHost = browserHost === "[::]"
         ? "[::]"
@@ -39,7 +43,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const isGamePage = /game\.html$/i.test(window.location.pathname);
     const gameCatalog = [
         { id: "001", slug: "tic-tac-toe", title: "Tic Tac Toe", type: "STRATEGY / 2 PLAYERS", status: "LIVE" },
-        { id: "002", slug: "word-bomb", title: "Word Bomb", type: "WORD / REALTIME ARENA", status: "LIVE" }
+        { id: "002", slug: "word-bomb", title: "Word Bomb", type: "WORD / REALTIME ARENA", status: "LIVE" },
+        { id: "003", slug: "timeline", title: "Timeline", type: "KNOWLEDGE / DAILY CHALLENGE", status: "DAILY" }
     ];
 
     const renderLibrary = () => {
@@ -66,7 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const query = input.value.trim().toLowerCase();
             if (!query) { close(); return; }
             const matches = gameCatalog.filter((game) => game.title.toLowerCase().includes(query) || game.slug.includes(query)).slice(0, 5);
-            results.innerHTML = matches.length ? matches.map((game) => `<a href="./${game.slug === "word-bomb" ? "word-bomb.html" : `game.html?game=${game.slug}`}" ><span>${game.id}</span><strong>${game.title}</strong><small>${game.status}</small></a>`).join("") : `<p class="search-empty">NO GAME FOUND</p>`;
+            results.innerHTML = matches.length ? matches.map((game) => `<a href="./${game.slug === "word-bomb" ? "word-bomb.html" : game.slug === "timeline" ? "timeline.html" : `game.html?game=${game.slug}`}" ><span>${game.id}</span><strong>${game.title}</strong><small>${game.status}</small></a>`).join("") : `<p class="search-empty">NO GAME FOUND</p>`;
             results.hidden = false;
         });
         document.addEventListener("click", (event) => { if (!search.contains(event.target)) close(); });

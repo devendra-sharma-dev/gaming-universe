@@ -14,6 +14,14 @@ const games = [
         multiplayer: true,
         status: "active",
         entryPoint: "/word-bomb.html"
+    },
+    {
+        id: "003",
+        slug: "timeline",
+        title: "Timeline",
+        multiplayer: false,
+        status: "active",
+        entryPoint: "/timeline.html"
     }
 ];
 
