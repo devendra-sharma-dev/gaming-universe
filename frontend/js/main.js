@@ -5,6 +5,10 @@ document.addEventListener("DOMContentLoaded", () => {
         window.location.replace("./timeline.html");
         return;
     }
+    if (new URLSearchParams(window.location.search).get("game") === "mystery-country") {
+        window.location.replace("./mystery-country.html");
+        return;
+    }
     const browserHost = window.location.hostname;
     const localApiHost = browserHost === "[::]"
         ? "[::]"
@@ -44,7 +48,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const gameCatalog = [
         { id: "001", slug: "tic-tac-toe", title: "Tic Tac Toe", type: "STRATEGY / 2 PLAYERS", status: "LIVE" },
         { id: "002", slug: "word-bomb", title: "Word Bomb", type: "WORD / REALTIME ARENA", status: "LIVE" },
-        { id: "003", slug: "timeline", title: "Timeline", type: "KNOWLEDGE / DAILY CHALLENGE", status: "DAILY" }
+        { id: "003", slug: "timeline", title: "Timeline", type: "KNOWLEDGE / DAILY CHALLENGE", status: "DAILY" },
+        { id: "004", slug: "mystery-country", title: "Mystery Country", type: "GEOGRAPHY / DAILY CHALLENGE", status: "DAILY" }
     ];
 
     const renderLibrary = () => {

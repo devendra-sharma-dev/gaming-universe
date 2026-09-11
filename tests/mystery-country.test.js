@@ -1,0 +1,10 @@
+const assert=require('assert');
+const countries=require('../backend/data/mysteryCountries');
+const {distanceKm,direction,heat,xpFor,countryForDate}=require('../backend/games/mysteryCountry/logic');
+const india=countries.find(c=>c.code==='IN'), chile=countries.find(c=>c.code==='CL');
+assert(distanceKm(india,chile)>15000);
+assert.strictEqual(direction(chile,india),'E');
+assert.strictEqual(heat(300).label,'Very Close');
+assert.strictEqual(xpFor(1,1),500); assert.strictEqual(xpFor(1,5),400); assert.strictEqual(xpFor(3),300);
+assert.strictEqual(countryForDate(countries,'2026-09-09').code,countryForDate(countries,'2026-09-09').code);
+console.log('Mystery Country logic tests passed.');

@@ -8,6 +8,7 @@ const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/users");
 const gameRoutes = require("./routes/games");
 const timelineRoutes = require("./routes/timeline");
+const mysteryCountryRoutes = require("./routes/mysteryCountry");
 
 const configuredFrontendOrigin = process.env.FRONTEND_ORIGIN;
 const developmentOrigins = new Set([
@@ -74,6 +75,7 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/games", gameRoutes);
 app.use("/api/v1/timeline", timelineRoutes);
+app.use("/api/v1/mystery-country", mysteryCountryRoutes);
 
 app.use((_request, response) => {
     response.status(404).json({
