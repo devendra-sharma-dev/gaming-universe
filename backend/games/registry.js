@@ -22,7 +22,8 @@ const games = [
         multiplayer: false,
         status: "active",
         entryPoint: "/timeline.html"
-    }
+    },
+    { id: "004", slug: "mystery-country", title: "Mystery Country", multiplayer: false, status: "daily", entryPoint: "/mystery-country.html" }
 ];
 
 const getGame = (slug) => games.find((game) => game.slug === slug) || null;

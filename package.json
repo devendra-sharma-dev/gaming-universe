@@ -8,7 +8,8 @@
     "dev": "node --watch backend/server.js",
     "start": "node backend/server.js",
     "timeline:validate": "node scripts/validate-timeline-dataset.js",
-    "timeline:import": "node scripts/import-timeline-dataset.js"
+    "timeline:import": "node scripts/import-timeline-dataset.js",
+    "test": "node tests/mystery-country.test.js"
   },
   "dependencies": {
     "argon2": "^0.45.1",
