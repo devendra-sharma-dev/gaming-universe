@@ -2,15 +2,19 @@ const mongoose = require("mongoose");
 
 const otpCodeSchema = new mongoose.Schema(
     {
-        mobile: {
+        email: {
             type: String,
-            required: true,
+            unique: true,
+            sparse: true,
             index: true
         },
+        challengeId: String,
+        browserTokenHash: String,
+        lastSentAt: Date,
 
         purpose: {
             type: String,
-            enum: ["signup", "password_reset"],
+            enum: ["email_signin"],
             required: true,
             index: true
         },

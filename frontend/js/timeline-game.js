@@ -2,7 +2,7 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     const host = window.location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost";
-    const API = `${window.GAMING_UNIVERSE_API_ORIGIN || `http://${host}:5051`}/api/v1`;
+    const API = `${window.GamingSession.apiOrigin}/api/v1`;
     const track = document.querySelector("#timeline-track");
     const drawer = document.querySelector("#timeline-cards");
     const submit = document.querySelector("#timeline-submit");
@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let daily; let roundIndex = 0; let placing = []; let drawerOrder = []; let locked = false;
 
     const api = async (path, options = {}) => {
-        const response = await fetch(`${API}${path}`, { credentials: "include", headers: { "Content-Type": "application/json" }, ...options });
+        const response = await window.GamingSession.fetch(`${API}${path}`, { credentials: "include", headers: { "Content-Type": "application/json" }, ...options });
         const body = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(body.error?.message || "The timeline could not be reached.");
         return body.data;

@@ -28,8 +28,7 @@ const createSessionMiddleware = () => {
             httpOnly: true,
             path: "/",
             sameSite: isProduction ? "none" : "lax",
-            secure: isProduction,
-            maxAge: 14 * 24 * 60 * 60 * 1000
+            secure: isProduction
         }
     });
 };

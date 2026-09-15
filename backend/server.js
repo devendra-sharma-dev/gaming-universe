@@ -12,6 +12,8 @@ const { Server } = require("socket.io");
 const { attachTicTacToe } = require("./realtime/ticTacToe");
 const { attachWordBomb } = require("./realtime/wordBomb");
 const crypto = require("crypto");
+const OtpCode = require("./models/OtpCode");
+const { matchesBrowserSession } = require("./services/browserSession");
 const guestNames = new Set();
 
 const createGuestName = () => {
@@ -34,6 +36,8 @@ const socketOrigins = [
 const startServer = async () => {
     try {
         await connectDatabase();
+        // Do not accept signups until the unique email/username indexes exist.
+        await Promise.all([User.init(), OtpCode.init()]);
 
         const { app, sessionMiddleware } = require("./app");
         const httpServer = http.createServer(app);
@@ -51,7 +55,7 @@ const startServer = async () => {
             try {
                 const session = socket.request.session;
 
-                if (!session || !session.userId) {
+                if (!session?.userId || !matchesBrowserSession(session, socket.handshake.auth.browserToken)) {
                     socket.user = {
                         id: `guest:${crypto.randomUUID()}`,
                         username: createGuestName(),
@@ -80,6 +84,20 @@ const startServer = async () => {
                     isGuest: false
                 };
 
+                // A socket must not keep account access after another tab logs out.
+                socket.use((_packet, nextPacket) => {
+                    socket.request.session.reload((error) => {
+                        const current = socket.request.session;
+                        if (error || String(current?.userId) !== socket.user.id ||
+                            !matchesBrowserSession(current, socket.handshake.auth.browserToken)) {
+                            socket.emit("session:expired");
+                            socket.disconnect(true);
+                            return nextPacket(new Error("Authentication required."));
+                        }
+                        nextPacket();
+                    });
+                });
+
                 next();
             } catch (_error) {
                 next(new Error("Socket authentication failed."));
@@ -103,6 +121,7 @@ const startServer = async () => {
         httpServer.listen(port, () => {
             console.log("Gaming Universe API listening on port " + port + ".");
         });
+        return { httpServer, io };
 } catch (error) {
     console.error("API startup failed:", error);
     process.exitCode = 1;

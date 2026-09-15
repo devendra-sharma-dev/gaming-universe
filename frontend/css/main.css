@@ -37,6 +37,11 @@
     --transition-normal: 300ms ease;
 }
 
+.username-status { font-size: 12px; line-height: 1.5; color: #a8b8c8; }
+.username-status.is-available { color: #64e7ae; }
+.username-status.is-error { color: #ff8c98; }
+.auth-form button:disabled { cursor: not-allowed; opacity: .5; }
+
 
 /* =========================================================
    RESET

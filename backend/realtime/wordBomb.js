@@ -57,11 +57,18 @@ const awardWinner = async (room, winner) => {
     return updated?.xp ?? null;
 };
 const finish = async (io, room, winner = null, reason = "victory") => {
+    if (room.status === "finished") return;
     room.status = "finished";
     room.winnerId = winner?.id || null;
     const totalXp = await awardWinner(room, winner);
     emitRoom(io, room);
-    io.to(room.room).emit("word-bomb:finished", { reason, winner: winner ? { id: winner.id, username: winner.username } : null, xpEarned: totalXp === null ? 0 : WIN_XP, totalXp });
+    io.to(room.room).emit("word-bomb:finished", {
+        reason,
+        winner: winner ? { id: winner.id, username: winner.username, isGuest: winner.isGuest } : null,
+        xpEarned: winner?.isGuest || totalXp !== null ? WIN_XP : 0,
+        xpSaved: totalXp !== null,
+        totalXp
+    });
     if (timers.has(room.matchId)) clearInterval(timers.get(room.matchId));
     timers.delete(room.matchId);
 };
@@ -116,6 +123,7 @@ const addPlayer = (room, socket) => {
 
 const attachWordBomb = (io) => {
     io.on("connection", (socket) => {
+        socket.emit("word-bomb:identity", { id: socket.user.id, isGuest: socket.user.isGuest });
         socket.on("word-bomb:quick-play", () => {
             if (waiting.includes(socket.id)) return;
             const opponentId = waiting.shift();

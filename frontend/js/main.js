@@ -9,15 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
         window.location.replace("./mystery-country.html");
         return;
     }
-    const browserHost = window.location.hostname;
-    const localApiHost = browserHost === "[::]"
-        ? "[::]"
-        : browserHost === "::1"
-            ? "[::1]"
-            : browserHost === "127.0.0.1"
-                ? "127.0.0.1"
-                : "localhost";
-    const API_ORIGIN = window.GAMING_UNIVERSE_API_ORIGIN || `http://${localApiHost}:5051`;
+    const API_ORIGIN = window.GamingSession.apiOrigin;
     const API = `${API_ORIGIN}/api/v1`;
     const navigation = document.querySelector(".main-navigation");
     const playerButton = document.querySelector(".navigation-player");
@@ -86,9 +78,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const showStartToast = () => { if (!startToast) return; clearTimeout(toastTimer); startToast.hidden = false; startToast.classList.add("is-visible"); toastTimer = setTimeout(() => { startToast.classList.remove("is-visible"); startToast.hidden = true; }, 5000); };
     const api = async (path, options = {}) => {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
+        const timeout = setTimeout(() => controller.abort(), path === "/auth/otp/send" ? 45000 : 15000);
         try {
-            const response = await fetch(`${API}${path}`, { credentials: "include", headers: { "Content-Type": "application/json", ...(options.headers || {}) }, ...options, signal: controller.signal });
+            const response = await window.GamingSession.fetch(`${API}${path}`, { credentials: "include", headers: { "Content-Type": "application/json", ...(options.headers || {}) }, ...options, signal: controller.signal });
             const body = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(body.error?.message || "Request could not be completed.");
             return body.data;
@@ -112,45 +104,140 @@ document.addEventListener("DOMContentLoaded", () => {
         overlay.setAttribute("aria-hidden", "true");
         playerButton?.focus({ preventScroll: true });
     };
-    const field = (name, type = "text", placeholder = "") => `<label>${name.toUpperCase()}<input name="${name}" type="${type}" placeholder="${placeholder}" required autocomplete="off"></label>`;
-    const form = (title, submit, fields) => `<form class="auth-form" data-auth-form="${authStep}"><h3>${title}</h3>${fields}<button class="game-action-button" type="submit">${submit}</button></form>`;
+    let usernameTimer = null;
+    let usernameRevision = 0;
+    let availableUsername = null;
+    let resendTimer = null;
+    let authBusy = false;
+    const form = (title, submit, fields) => '<form class="auth-form"><h3>' + title + '</h3>' + fields + '<button class="game-action-button" type="submit">' + submit + '</button></form>';
     const renderAuth = () => {
         if (!authView) return;
-        if (authStep === "account") { authTitle.textContent = "YOUR UNIVERSE"; authView.innerHTML = `<div class="auth-account"><strong>@${currentUser?.username || "GUEST"}</strong><span>${currentUser?.xp || 0} XP</span><button class="game-action-button" type="button" data-auth-logout>LOG OUT</button></div>`; return; }
-        authTitle.textContent = authStep.startsWith("signup") ? "CREATE YOUR UNIVERSE ID" : "ENTER THE UNIVERSE";
-        if (authStep === "login") authView.innerHTML = form("WELCOME BACK", "LOGIN", field("mobile", "tel", "+91...") + field("password", "password", "Your password"));
-        else if (authStep === "signup") authView.innerHTML = form("BEGIN YOUR ACCOUNT", "SEND SIGNUP OTP", field("mobile", "tel", "+91..."));
-        else if (authStep === "signup-otp") authView.innerHTML = form("VERIFY MOBILE", "VERIFY OTP", field("otp", "text", "6 digit code"));
-        else if (authStep === "signup-username") authView.innerHTML = form("CHOOSE USERNAME", "CONTINUE", field("username", "text", "Unique handle"));
-        else if (authStep === "signup-password") authView.innerHTML = form("SECURE ACCOUNT", "CREATE ACCOUNT", field("password", "password", "At least 8 characters"));
-        else if (authStep === "forgot") authView.innerHTML = form("RESET ACCESS", "SEND RESET OTP", field("mobile", "tel", "+91..."));
-        else if (authStep === "forgot-otp") authView.innerHTML = form("VERIFY RESET OTP", "VERIFY OTP", field("otp", "text", "6 digit code"));
-        else if (authStep === "reset-password") authView.innerHTML = form("NEW PASSWORD", "RESET PASSWORD", field("password", "password", "At least 8 characters"));
+        clearTimeout(usernameTimer);
+        clearInterval(resendTimer);
+        usernameRevision += 1;
+        availableUsername = null;
+        setMessage('');
+        document.querySelector('#auth-navigation').hidden = authStep === 'account';
+        if (authStep === 'account') {
+            authTitle.textContent = 'YOUR UNIVERSE';
+            authView.innerHTML = '<div class="auth-account"><strong></strong><span></span><button class="game-action-button" type="button" data-auth-logout>LOG OUT</button></div>';
+            authView.querySelector('strong').textContent = '@' + currentUser.username;
+            authView.querySelector('span').textContent = currentUser.xp + ' XP';
+            return;
+        }
+        authTitle.textContent = 'ENTER THE UNIVERSE';
+        if (authStep === 'otp') {
+            authView.innerHTML = form('CHECK YOUR EMAIL', 'VERIFY CODE', '<label>EMAIL CODE<input name="otp" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6 digit code" required></label>') + '<button class="game-secondary-button" type="button" data-auth-resend>RESEND CODE</button>';
+            setMessage('We sent a code to ' + authContext.email + '. It expires in 5 minutes.');
+            const updateResend = () => {
+                const button = authView.querySelector('[data-auth-resend]');
+                if (!button) return;
+                const seconds = Math.max(0, Math.ceil((authContext.resendAt - Date.now()) / 1000));
+                button.disabled = authBusy || seconds > 0;
+                button.textContent = seconds ? 'RESEND IN ' + seconds + 's' : 'RESEND CODE';
+            };
+            updateResend();
+            resendTimer = setInterval(updateResend, 1000);
+        } else if (authStep === 'username') {
+            authView.innerHTML = form('CHOOSE YOUR USERNAME', 'SAVE & PLAY', '<label>USERNAME<input name="username" type="text" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username" aria-describedby="username-status" placeholder="Unique handle" required></label><p id="username-status" class="username-status" aria-live="polite">Use 3?20 letters, numbers, or underscores.</p>');
+            authView.querySelector('[type="submit"]').disabled = true;
+        } else {
+            authStep = 'login';
+            authView.innerHTML = form('SIGN IN OR CREATE AN ACCOUNT', 'SEND EMAIL CODE', '<label>EMAIL ADDRESS<input name="email" type="email" maxlength="254" autocomplete="email" placeholder="you@example.com" required></label>');
+            setMessage('New here? Verify your email, then choose a username. Returning players keep their account and XP.');
+        }
+        authView.querySelector('input')?.focus();
     };
-    const refreshUser = async () => { try { const data = await api("/users/me"); updateIdentity(data.user || data); } catch (_error) { updateIdentity(null); } };
+    const refreshUser = async () => {
+        try { const data = await api('/users/me'); updateIdentity(data.user || data); }
+        catch (_error) { updateIdentity(null); }
+    };
+    const completeLogin = (user) => {
+        socket?.disconnect();
+        updateIdentity(user); // Only the database balance is used. Guest XP is never submitted.
+        closeAuth();
+        window.GamingSession.identityChanged();
+        if (isGamePage) startComputer();
+    };
+    const sendCode = async (email) => {
+        const result = await api('/auth/otp/send', { method: 'POST', body: JSON.stringify({ email }) });
+        authContext = { email: result.email, resendAt: Date.now() + result.retryAfter * 1000 };
+        authStep = 'otp';
+        renderAuth();
+    };
     const handleAuthSubmit = async (formElement) => {
+        if (authBusy) return;
         const data = Object.fromEntries(new FormData(formElement).entries());
+        if (authStep === 'username' && availableUsername !== data.username.trim()) return;
+        authBusy = true;
+        formElement.querySelectorAll('input,button').forEach(el => { el.disabled = true; });
         try {
-            setMessage("Processing...");
-            if (authStep === "login") { const result = await api("/auth/login", { method: "POST", body: JSON.stringify(data) }); updateIdentity(result.user); closeAuth(); startComputer(); return; }
-            if (authStep === "signup") { await api("/auth/otp/send", { method: "POST", body: JSON.stringify({ mobile: data.mobile, purpose: "signup" }) }); authContext.mobile = data.mobile; authStep = "signup-otp"; renderAuth(); return; }
-            if (authStep === "signup-otp") { await api("/auth/otp/verify", { method: "POST", body: JSON.stringify({ mobile: authContext.mobile, otp: data.otp, purpose: "signup" }) }); authStep = "signup-username"; renderAuth(); return; }
-            if (authStep === "signup-username") { const available = await api(`/auth/username/check?username=${encodeURIComponent(data.username)}`); if (!available.available) throw new Error("That username is already taken."); authContext.username = data.username; authStep = "signup-password"; renderAuth(); return; }
-            if (authStep === "signup-password") { const result = await api("/auth/register", { method: "POST", body: JSON.stringify({ mobile: authContext.mobile, username: authContext.username, password: data.password }) }); updateIdentity(result.user); closeAuth(); startComputer(); return; }
-            if (authStep === "forgot") { await api("/auth/otp/send", { method: "POST", body: JSON.stringify({ mobile: data.mobile, purpose: "password_reset" }) }); authContext.mobile = data.mobile; authStep = "forgot-otp"; renderAuth(); return; }
-            if (authStep === "forgot-otp") { await api("/auth/otp/verify", { method: "POST", body: JSON.stringify({ mobile: authContext.mobile, otp: data.otp, purpose: "password_reset" }) }); authStep = "reset-password"; renderAuth(); return; }
-            if (authStep === "reset-password") { await api("/auth/password/reset", { method: "POST", body: JSON.stringify({ mobile: authContext.mobile, password: data.password }) }); authStep = "login"; renderAuth(); setMessage("Password reset. You can log in now."); }
+            setMessage('Processing...');
+            if (authStep === 'login') await sendCode(data.email);
+            else if (authStep === 'otp') {
+                const result = await api('/auth/otp/verify', { method: 'POST', body: JSON.stringify({ email: authContext.email, otp: data.otp }) });
+                if (result.needsUsername) { authStep = 'username'; renderAuth(); }
+                else completeLogin(result.user);
+            } else if (authStep === 'username') {
+                const result = await api('/auth/register', { method: 'POST', body: JSON.stringify({ username: data.username.trim() }) });
+                completeLogin(result.user);
+            }
         } catch (error) { setMessage(error.message, true); }
+        finally {
+            authBusy = false;
+            if (formElement.isConnected) {
+                formElement.querySelectorAll('input,button').forEach(el => { el.disabled = false; });
+                if (authStep === 'username') formElement.querySelector('[type="submit"]').disabled = !availableUsername;
+            }
+        }
     };
+    authView?.addEventListener('input', (event) => {
+        if (event.target.name !== 'username') return;
+        clearTimeout(usernameTimer);
+        const revision = ++usernameRevision;
+        const username = event.target.value.trim();
+        const feedback = authView.querySelector('#username-status');
+        const submit = authView.querySelector('[type="submit"]');
+        availableUsername = null;
+        submit.disabled = true;
+        feedback.className = 'username-status';
+        if (!/^[A-Za-z0-9_]{3,20}$/.test(username)) {
+            feedback.textContent = 'Use 3?20 letters, numbers, or underscores.';
+            return;
+        }
+        feedback.textContent = 'Checking availability...';
+        usernameTimer = setTimeout(async () => {
+            try {
+                const result = await api('/auth/username/check?username=' + encodeURIComponent(username));
+                if (revision !== usernameRevision) return;
+                availableUsername = result.available ? username : null;
+                feedback.textContent = result.available ? 'Username available.' : 'Username already taken. Choose another.';
+                feedback.className = 'username-status ' + (result.available ? 'is-available' : 'is-error');
+                submit.disabled = !result.available;
+            } catch (error) {
+                if (revision !== usernameRevision) return;
+                feedback.textContent = error.message;
+                feedback.className = 'username-status is-error';
+            }
+        }, 300);
+    });
+    authView?.addEventListener('click', async event => {
+        if (!event.target.matches('[data-auth-resend]') || authBusy) return;
+        authBusy = true;
+        event.target.disabled = true;
+        try { await sendCode(authContext.email); }
+        catch (error) { setMessage(error.message, true); }
+        finally { authBusy = false; }
+    });
     const clearBoard = () => document.querySelectorAll(".board-cell").forEach((cell) => { cell.textContent = ""; cell.classList.remove("is-x", "is-o", "is-winning"); cell.disabled = true; });
     const showResult = (state, xpEarned = 0) => { if (!resultPanel) return; resultPanel.hidden = false; const won = state.winner === ownSymbol || state.winnerSymbol === ownSymbol; resultTitle.textContent = won ? "VICTORY" : state.status === "draw" ? "DRAW" : "MATCH LOST"; resultCopy.textContent = xpEarned ? `+${xpEarned} XP  ·  TOTAL XP: ${currentUser?.xp || 0}` : won ? "The line is yours." : state.status === "draw" ? "No line conquered this time." : "The universe has another answer."; };
     const renderMatch = (state) => { match = state; document.querySelectorAll(".board-cell").forEach((cell) => { const index = Number(cell.dataset.cell); const value = state.board?.[index]; cell.textContent = value || ""; cell.classList.toggle("is-x", value === "X"); cell.classList.toggle("is-o", value === "O"); cell.classList.toggle("is-winning", (state.winningCells || []).includes(index)); cell.disabled = state.status !== "active" || Boolean(value) || state.currentTurn !== ownSymbol || computerThinking; }); turn.textContent = state.status === "active" ? state.currentTurn : "—"; opponentName.textContent = state.players?.find((p) => p.symbol !== ownSymbol)?.username || (mode === "computer" ? "COMPUTER" : "SEARCHING..."); command.textContent = state.status === "active" ? (computerThinking ? "Computer is thinking..." : state.currentTurn === ownSymbol ? "Your move. Read the next line." : "Opponent is calculating the next move.") : "Match complete."; if (state.status !== "active") showResult(state); };
     const startComputer = async () => { await authReady; if (!currentUser) { openAuth("login"); return; } showStartToast(); mode = "computer"; resultPanel.hidden = true; clearBoard(); ownSymbol = "X"; gameStatus.textContent = "Computer match online."; opponentName.textContent = "COMPUTER"; try { const data = await api("/games/tic-tac-toe/computer/matches", { method: "POST" }); renderMatch(data.match); } catch (error) { gameStatus.textContent = error.message; } };
-    const startPlayer = async () => { await authReady; if (!currentUser) { openAuth("login"); return; } showStartToast(); mode = "player"; resultPanel.hidden = true; clearBoard(); gameStatus.textContent = "Searching for a live player..."; command.textContent = "Scanning the live queue."; if (!socket) socket = window.io(API_ORIGIN, { withCredentials: true, autoConnect: false }); if (!socketHandlersReady) { socket.on("tic-tac-toe:matched", (data) => { ownSymbol = data.ownSymbol; gameStatus.textContent = `Live match · ${data.opponentUsername}`; renderMatch(data.match); }); socket.on("tic-tac-toe:queue-status", () => { gameStatus.textContent = "Searching for a live player..."; }); socket.on("tic-tac-toe:state", (data) => renderMatch(data.match)); socket.on("tic-tac-toe:xp-awarded", (data) => { if (currentUser) { currentUser.xp = data.totalXp; updateIdentity(currentUser); } showResult(match, data.xpEarned); }); socket.on("tic-tac-toe:matchmaking-timeout", () => { gameStatus.textContent = "No player is live right now. Starting a match against the computer..."; setTimeout(startComputer, 1200); }); socket.on("tic-tac-toe:opponent-left", (data) => { gameStatus.textContent = data.message; }); socket.on("tic-tac-toe:error", (data) => { gameStatus.textContent = data.message; }); socketHandlersReady = true; } if (!socket.connected) socket.connect(); socket.emit("tic-tac-toe:queue"); };
+    const startPlayer = async () => { await authReady; try { await window.GamingSession.loadSocketClient(); } catch (error) { gameStatus.textContent = error.message; return; } if (!currentUser) { openAuth("login"); return; } showStartToast(); mode = "player"; resultPanel.hidden = true; clearBoard(); gameStatus.textContent = "Searching for a live player..."; command.textContent = "Scanning the live queue."; if (!socket) socket = window.io(API_ORIGIN, { withCredentials: true, autoConnect: false, auth: window.GamingSession.socketAuth }); if (!socketHandlersReady) { socket.on("session:expired", () => window.location.reload()); socket.on("tic-tac-toe:matched", (data) => { ownSymbol = data.ownSymbol; gameStatus.textContent = `Live match · ${data.opponentUsername}`; renderMatch(data.match); }); socket.on("tic-tac-toe:queue-status", () => { gameStatus.textContent = "Searching for a live player..."; }); socket.on("tic-tac-toe:state", (data) => renderMatch(data.match)); socket.on("tic-tac-toe:xp-awarded", (data) => { if (currentUser) { currentUser.xp = data.totalXp; updateIdentity(currentUser); } showResult(match, data.xpEarned); }); socket.on("tic-tac-toe:matchmaking-timeout", () => { gameStatus.textContent = "No player is live right now. Starting a match against the computer..."; setTimeout(startComputer, 1200); }); socket.on("tic-tac-toe:opponent-left", (data) => { gameStatus.textContent = data.message; }); socket.on("tic-tac-toe:error", (data) => { gameStatus.textContent = data.message; }); socketHandlersReady = true; } if (!socket.connected) socket.connect(); socket.emit("tic-tac-toe:queue"); };
     board?.addEventListener("click", async (event) => { const cell = event.target.closest(".board-cell"); if (!cell || !match || match.status !== "active" || computerThinking) return; const index = Number(cell.dataset.cell); try { if (mode === "computer") { computerThinking = true; const previousMatch = match; const optimisticBoard = match.board.slice(); optimisticBoard[index] = "X"; renderMatch({ ...match, board: optimisticBoard, currentTurn: "O", status: "active" }); gameStatus.textContent = "Computer is thinking..."; await new Promise((resolve) => setTimeout(resolve, 850)); const data = await api(`/games/tic-tac-toe/computer/matches/${previousMatch.matchId}/moves`, { method: "POST", body: JSON.stringify({ cell: index }) }); const completedMatch = data.match; computerThinking = false; renderMatch(completedMatch); if (completedMatch.xpEarned) { currentUser.xp = completedMatch.totalXp; updateIdentity(currentUser); showResult(completedMatch, completedMatch.xpEarned); } } else socket.emit("tic-tac-toe:move", { matchId: match.matchId, cell: index }); } catch (error) { computerThinking = false; gameStatus.textContent = error.message; } });
     document.querySelectorAll("[data-game-mode]").forEach((button) => button.addEventListener("click", () => button.dataset.gameMode === "computer" ? startComputer() : startPlayer()));
     primary?.addEventListener("click", () => mode === "player" ? startPlayer() : startComputer()); document.querySelector("#game-replay-button")?.addEventListener("click", () => mode === "player" ? startPlayer() : startComputer()); document.querySelector("#game-new-player-button")?.addEventListener("click", () => { window.location.href = "./index.html"; }); document.querySelector("#game-result-close")?.addEventListener("click", () => { if (resultPanel) resultPanel.hidden = true; }); document.querySelector("#game-exit-button")?.addEventListener("click", () => { socket?.emit("tic-tac-toe:cancel"); match = null; resultPanel.hidden = true; clearBoard(); gameStatus.textContent = "Arena reset."; });
-    document.querySelector("#auth-close-button")?.addEventListener("click", closeAuth); overlay?.addEventListener("click", (event) => { if (event.target === overlay) closeAuth(); }); authView?.addEventListener("submit", (event) => { event.preventDefault(); handleAuthSubmit(event.target); }); document.querySelector("#auth-navigation")?.addEventListener("click", (event) => { const button = event.target.closest("[data-auth-switch]"); if (button) openAuth(button.dataset.authSwitch); }); authView?.addEventListener("click", async (event) => { if (event.target.matches("[data-auth-logout]")) { await api("/auth/logout", { method: "POST" }); updateIdentity(null); closeAuth(); } });
+    document.querySelector("#auth-close-button")?.addEventListener("click", closeAuth); overlay?.addEventListener("click", (event) => { if (event.target === overlay) closeAuth(); }); authView?.addEventListener("submit", (event) => { event.preventDefault(); handleAuthSubmit(event.target); }); document.querySelector("#auth-navigation")?.addEventListener("click", (event) => { const button = event.target.closest("[data-auth-switch]"); if (button && !authBusy) openAuth(button.dataset.authSwitch); }); authView?.addEventListener("click", async (event) => { if (event.target.matches("[data-auth-logout]")) { try { await api("/auth/logout", { method: "POST" }); socket?.disconnect(); updateIdentity(null); closeAuth(); window.GamingSession.identityChanged(); if (isGamePage) window.location.reload(); } catch (error) { setMessage(error.message, true); } } });
     playerButton?.addEventListener("click", () => currentUser ? openAuth("account") : openAuth("login")); playerButton?.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") playerButton.click(); });
     navigation?.addEventListener("mousemove", (event) => { const rect = navigation.getBoundingClientRect(); if (rect.width && rect.height) { navigation.style.setProperty("--mouse-x", `${((event.clientX - rect.left) / rect.width) * 100}%`); navigation.style.setProperty("--mouse-y", `${((event.clientY - rect.top) / rect.height) * 100}%`); } }); navigation?.addEventListener("mouseleave", () => { navigation.style.setProperty("--mouse-x", "50%"); navigation.style.setProperty("--mouse-y", "50%"); });
     if (!isGamePage) renderLibrary();

@@ -9,7 +9,8 @@
     "start": "node backend/server.js",
     "timeline:validate": "node scripts/validate-timeline-dataset.js",
     "timeline:import": "node scripts/import-timeline-dataset.js",
-    "test": "node tests/mystery-country.test.js"
+    "test": "node tests/mystery-country.test.js && node tests/session.test.js",
+    "test:auth": "node tests/email-auth.test.js"
   },
   "dependencies": {
     "argon2": "^0.45.1",
@@ -21,6 +22,11 @@
     "express-session": "^1.19.0",
     "helmet": "^8.0.0",
     "mongoose": "^8.9.5",
+    "nodemailer": "^10.0.10",
     "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "mongodb-memory-server": "^11.2.0"
   }
 }

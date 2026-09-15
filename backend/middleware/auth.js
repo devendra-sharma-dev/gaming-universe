@@ -1,8 +1,9 @@
 const User = require("../models/User");
+const { matchesBrowserSession } = require("../services/browserSession");
 
 const requireAuth = async (request, response, next) => {
     try {
-        if (!request.session || !request.session.userId) {
+        if (!request.session?.userId || !matchesBrowserSession(request.session, request.get("X-Browser-Session"))) {
             return response.status(401).json({
                 success: false,
                 error: {

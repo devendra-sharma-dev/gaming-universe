@@ -101,7 +101,7 @@ app.use((error, _request, response, _next) => {
         ? error.status
         : 500;
 
-    if (status >= 500) {
+    if (status >= 500 && !error?.publicMessage) {
         console.error("Unhandled server error.");
     }
 
@@ -109,9 +109,9 @@ app.use((error, _request, response, _next) => {
         success: false,
         error: {
             message:
-                status >= 500
+                error?.publicMessage || (status >= 500
                     ? "Internal server error."
-                    : error.message
+                    : error.message)
         }
     });
 });

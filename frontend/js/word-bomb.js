@@ -1,12 +1,14 @@
 "use strict";
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+    try { await window.GamingSession.loadSocketClient(); }
+    catch (error) { document.getElementById("word-bomb-message").textContent = error.message; return; }
     const host = window.location.hostname === "[::]" ? "[::]" : window.location.hostname || "localhost";
-    const apiOrigin = `http://${host}:5051`;
-    const socket = window.io(apiOrigin, { withCredentials: true });
+    const apiOrigin = window.GamingSession.apiOrigin;
+    const socket = window.io(apiOrigin, { withCredentials: true, auth: window.GamingSession.socketAuth });
     const gameCatalog = [{ id: "001", slug: "tic-tac-toe", title: "Tic Tac Toe", status: "LIVE" }, { id: "002", slug: "word-bomb", title: "Word Bomb", status: "LIVE" }];
     const $ = (id) => document.getElementById(id);
     const message = $("word-bomb-message"), sequence = $("word-bomb-sequence"), timer = $("word-bomb-timer"), turn = $("word-bomb-turn"), form = $("word-bomb-form"), input = $("word-bomb-input"), feed = $("word-bomb-feed"), lobby = $("word-bomb-lobby"), players = $("word-bomb-players"), start = $("word-bomb-start"), arena = $("word-bomb-arena"), orbit = $("word-bomb-orbit"), turnArrow = $("word-bomb-turn-arrow"), usedWords = $("word-bomb-used-words");
-    let room = null; let timerId = null;
+    let room = null; let timerId = null; let identity = null; let guestXp = 0;
     const searchInput = $("game-search");
     const searchResults = $("game-search-results");
     searchInput?.addEventListener("input", () => {
@@ -23,13 +25,14 @@ document.addEventListener("DOMContentLoaded", () => {
     $("word-bomb-join").onclick = () => { socket.emit("word-bomb:join-room", { code: $("word-bomb-code").value }); };
     start.onclick = () => socket.emit("word-bomb:start-room");
     form.onsubmit = (event) => { event.preventDefault(); if (!room || room.status !== "active") return; socket.emit("word-bomb:submit", { word: input.value }); input.select(); };
-    fetch(`${apiOrigin}/api/v1/users/me`, { credentials: "include" })
+    window.GamingSession.fetch(`${apiOrigin}/api/v1/users/me`, { credentials: "include" })
         .then((response) => response.ok ? response.json() : null)
         .then((body) => {
             const user = body?.data?.user || body?.data;
             if (user?.username) $("word-bomb-identity").textContent = `@${user.username}`;
         })
         .catch(() => {});
+    socket.on("session:expired", () => window.location.reload());
     socket.on("connect", () => { if ($("word-bomb-identity").textContent === "") $("word-bomb-identity").textContent = "GUEST"; });
     socket.on("word-bomb:queue", () => { message.textContent = "Waiting for another player..."; });
     socket.on("word-bomb:room-created", ({ room: created }) => { message.textContent = `Room ${created.code} ready. Invite friends.`; render(created); });
@@ -40,6 +43,16 @@ document.addEventListener("DOMContentLoaded", () => {
     socket.on("word-bomb:penalty", ({ username, reason }) => { feed.textContent = `${username} lost a life (${reason}).`; arena?.classList.remove("bomb-blast"); void arena?.offsetWidth; arena?.classList.add("bomb-blast"); setTimeout(() => arena?.classList.remove("bomb-blast"), 900); });
     socket.on("word-bomb:eliminated", ({ username }) => { feed.textContent = `${username} has been eliminated.`; });
     socket.on("word-bomb:alphabet-bonus", ({ username }) => { feed.textContent = `${username} completed A–Z and earned an extra life.`; });
-    socket.on("word-bomb:finished", ({ winner, xpEarned, totalXp }) => { message.textContent = winner ? `${winner.username} wins the arena.` : "Match ended."; feed.textContent = xpEarned ? `+${xpEarned} XP · TOTAL XP ${totalXp}` : "No XP awarded."; });
+    socket.on("word-bomb:identity", (value) => { identity = value; });
+    socket.on("word-bomb:finished", ({ winner, xpEarned, xpSaved, totalXp }) => {
+        message.textContent = winner ? winner.username + " wins the arena." : "Match ended.";
+        if (winner?.isGuest && xpEarned) {
+            feed.textContent = "Guest reward: +" + xpEarned + " XP (not saved).";
+            if (winner.id === identity?.id) {
+                guestXp += xpEarned;
+                $("word-bomb-identity").textContent = "GUEST ? " + guestXp + " XP (NOT SAVED)";
+            }
+        } else feed.textContent = xpSaved ? "+" + xpEarned + " XP ? WINNER TOTAL XP " + totalXp : "No XP awarded.";
+    });
     socket.on("word-bomb:error", ({ message: text }) => { message.textContent = text; });
 });

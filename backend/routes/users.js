@@ -10,7 +10,7 @@ router.get("/me", requireAuth, (request, response) => {
         data: {
             id: request.user._id,
             username: request.user.username,
-            mobile: request.user.mobile,
+            email: request.user.email,
             xp: request.user.xp,
             favorites: request.user.favorites
         }
