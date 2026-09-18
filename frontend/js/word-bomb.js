@@ -4,11 +4,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     catch (error) { document.getElementById("word-bomb-message").textContent = error.message; return; }
     const host = window.location.hostname === "[::]" ? "[::]" : window.location.hostname || "localhost";
     const apiOrigin = window.GamingSession.apiOrigin;
-    const socket = window.io(apiOrigin, { withCredentials: true, auth: window.GamingSession.socketAuth });
+    const socket = window.io(apiOrigin, { transports: ["websocket"], withCredentials: true, auth: window.GamingSession.socketAuth });
     const gameCatalog = [{ id: "001", slug: "tic-tac-toe", title: "Tic Tac Toe", status: "LIVE" }, { id: "002", slug: "word-bomb", title: "Word Bomb", status: "LIVE" }];
     const $ = (id) => document.getElementById(id);
     const message = $("word-bomb-message"), sequence = $("word-bomb-sequence"), timer = $("word-bomb-timer"), turn = $("word-bomb-turn"), form = $("word-bomb-form"), input = $("word-bomb-input"), feed = $("word-bomb-feed"), lobby = $("word-bomb-lobby"), players = $("word-bomb-players"), start = $("word-bomb-start"), arena = $("word-bomb-arena"), orbit = $("word-bomb-orbit"), turnArrow = $("word-bomb-turn-arrow"), usedWords = $("word-bomb-used-words");
     let room = null; let timerId = null; let identity = null; let guestXp = 0;
+    const rewardedMatches = new Set();
     const searchInput = $("game-search");
     const searchResults = $("game-search-results");
     searchInput?.addEventListener("input", () => {
@@ -44,11 +45,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     socket.on("word-bomb:eliminated", ({ username }) => { feed.textContent = `${username} has been eliminated.`; });
     socket.on("word-bomb:alphabet-bonus", ({ username }) => { feed.textContent = `${username} completed A–Z and earned an extra life.`; });
     socket.on("word-bomb:identity", (value) => { identity = value; });
-    socket.on("word-bomb:finished", ({ winner, xpEarned, xpSaved, totalXp }) => {
+    socket.on("word-bomb:finished", ({ matchId, winner, xpEarned, xpSaved, totalXp }) => {
         message.textContent = winner ? winner.username + " wins the arena." : "Match ended.";
         if (winner?.isGuest && xpEarned) {
             feed.textContent = "Guest reward: +" + xpEarned + " XP (not saved).";
-            if (winner.id === identity?.id) {
+            if (winner.id === identity?.id && !rewardedMatches.has(matchId || room?.matchId)) {
+                rewardedMatches.add(matchId || room?.matchId);
                 guestXp += xpEarned;
                 $("word-bomb-identity").textContent = "GUEST ? " + guestXp + " XP (NOT SAVED)";
             }

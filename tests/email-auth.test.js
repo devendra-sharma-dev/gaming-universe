@@ -3,7 +3,7 @@ const { once } = require("node:events");
 const http = require("node:http");
 const express = require("express");
 const mongoose = require("mongoose");
-const { MongoMemoryServer } = require("mongodb-memory-server");
+const { MongoMemoryServer, MongoMemoryReplSet } = require("mongodb-memory-server");
 const { chromium } = require("@playwright/test");
 const crypto = require("node:crypto");
 
@@ -19,7 +19,9 @@ async function run() {
         },
         close() {}
     });
-    const mongo = await MongoMemoryServer.create();
+    const shared = process.argv.includes("--shared");
+    if (shared) process.env.VERCEL = "1";
+    const mongo = shared ? await MongoMemoryReplSet.create({ replSet: { count: 1 } }) : await MongoMemoryServer.create();
     const frontend = http.createServer(express().use(express.static("frontend")));
     frontend.listen(0, "127.0.0.1");
     await once(frontend, "listening");
@@ -35,23 +37,42 @@ async function run() {
     const originalCreate = MongoStore.create;
     let store;
     MongoStore.create = function (...args) { store = originalCreate.apply(this, args); return store; };
-    const started = await require("../backend/server")();
+    const started = await require("../backend/server")({ shared });
     const apiOrigin = `http://127.0.0.1:${port}`;
     let browser;
+    let secondServer;
     try {
         if (!started) throw new Error("Test API failed to start");
+        let secondOrigin = apiOrigin;
+        if (shared) {
+            secondServer = require("../backend/server").createGameServer({ shared: true });
+            await secondServer.ready();
+            secondServer.httpServer.listen(0, "127.0.0.1");
+            await once(secondServer.httpServer, "listening");
+            secondOrigin = `http://127.0.0.1:${secondServer.httpServer.address().port}`;
+        }
         const User = require("../backend/models/User");
         const Otp = require("../backend/models/OtpCode");
         await User.create({ email: "reserved@example.com", username: "TakenName", usernameNormalized: "takenname", xp: 0 });
         browser = await chromium.launch({ channel: process.env.TEST_BROWSER_CHANNEL || "msedge", headless: true });
         const contexts = [];
-        const newContext = async () => {
+        const newContext = async (backendOrigin = apiOrigin) => {
             const context = await browser.newContext();
             await context.addInitScript(origin => {
                 window.GAMING_UNIVERSE_API_ORIGIN = origin;
                 // Reproduce local HTTP browsers where randomUUID is unavailable.
                 Object.defineProperty(crypto, "randomUUID", { value: undefined });
-            }, apiOrigin);
+                let client;
+                window.testSockets = [];
+                Object.defineProperty(window, "io", { configurable: true,
+                    get: () => client,
+                    set: value => { client = (...args) => {
+                        const socket = value(...args);
+                        window.testSockets.push(socket);
+                        return socket;
+                    }; }
+                });
+            }, backendOrigin);
             contexts.push(context);
             return context;
         };
@@ -112,7 +133,7 @@ async function run() {
         assert.equal((await api(otherTab, "/users/me")).body.data.username, "NewPlayer");
         await otherTab.evaluate(() => window.GamingSession.loadSocketClient());
         const socketIdentity = await otherTab.evaluate(origin => new Promise(resolve => {
-            const socket = window.io(origin, { forceNew: true, withCredentials: true, auth: window.GamingSession.socketAuth });
+            const socket = window.io(origin, { transports: ["websocket"], forceNew: true, withCredentials: true, auth: window.GamingSession.socketAuth });
             socket.on("word-bomb:identity", value => { socket.disconnect(); resolve(value); });
         }), apiOrigin);
         assert.equal(socketIdentity.isGuest, false);
@@ -174,7 +195,7 @@ async function run() {
         console.log("PASS concurrent signup, database username uniqueness, forged email/XP rejection, OTP expiry, socket session binding");
 
         const guestContext = await newContext();
-        const rivalContext = await newContext();
+        const rivalContext = await newContext(secondOrigin);
         const guest = await newPage(guestContext, "/word-bomb.html");
         const rival = await newPage(rivalContext, "/word-bomb.html");
         await guest.locator("#word-bomb-create").click();
@@ -185,6 +206,18 @@ async function run() {
         await guest.locator("#word-bomb-start").waitFor({ state: "visible" });
         await guest.locator("#word-bomb-start").click();
         await expectText(guest, "#word-bomb-message", "Find a word");
+        if (shared) {
+            const before = await guest.locator("#word-bomb-players").textContent();
+            await guest.evaluate(origin => new Promise(resolve => {
+                const socket = window.testSockets[0];
+                socket.once("disconnect", () => { socket.io.uri = origin; });
+                socket.once("connect", resolve);
+                socket.io.engine.close();
+            }), secondOrigin);
+            await expectText(guest, "#word-bomb-message", "Find a word");
+            assert.equal(await guest.locator("#word-bomb-players").textContent(), before);
+            console.log("PASS live players on separate servers and WebSocket reconnect to another server");
+        }
         await rival.close();
         await expectText(guest, "#word-bomb-feed", "not saved");
         await expectText(guest, "#word-bomb-identity", "30 XP");
@@ -200,6 +233,7 @@ async function run() {
         for (const context of contexts) await context.close();
     } finally {
         await browser?.close();
+        if (secondServer) await new Promise(resolve => secondServer.io.close(resolve));
         if (started) await new Promise(resolve => started.io.close(resolve));
         await new Promise(resolve => frontend.close(resolve));
         await store?.close();

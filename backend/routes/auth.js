@@ -6,7 +6,9 @@ const { issueOtp, verifyOtp, normalizeEmail, validateEmail } = require("../servi
 const { requestTokenHash, matchesBrowserSession } = require("../services/browserSession");
 
 const router = express.Router();
+const MongoRateLimitStore = require("../services/rateLimitStore");
 const limiter = (limit) => rateLimit({ windowMs: 15 * 60 * 1000, limit,
+    ...(process.env.VERCEL ? { store: new MongoRateLimitStore(`auth-${limit}`) } : {}),
     standardHeaders: "draft-7", legacyHeaders: false,
     message: { success: false, error: { message: "Too many attempts. Please try again later." } } });
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
@@ -84,7 +86,7 @@ router.post("/logout", asyncRoute(async (req, res) => {
     if (matchesBrowserSession(req.session, req.get("X-Browser-Session"))) {
         await new Promise((resolve, reject) => req.session.destroy(error => error ? reject(error) : resolve()));
         res.clearCookie("gaming_universe.sid", { path: "/", httpOnly: true,
-            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", secure: process.env.NODE_ENV === "production" });
+            sameSite: process.env.NODE_ENV === "production" && !process.env.VERCEL ? "none" : "lax", secure: process.env.NODE_ENV === "production" });
     }
     res.json({ success: true, data: { loggedOut: true } });
 }));

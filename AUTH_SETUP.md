@@ -1,5 +1,7 @@
 # Email OTP authentication
 
+For a hosted test deployment of both frontend and backend on Vercel, see [DEPLOYMENT.md](DEPLOYMENT.md). Local development instructions below still apply.
+
 ## Configure delivery
 
 The backend sends email through Nodemailer SMTP. Fill in the following entries in the root `.env` (blank entries were added without changing existing values):

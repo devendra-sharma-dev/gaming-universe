@@ -5,12 +5,15 @@
   "description": "Gaming Universe platform backend",
   "main": "backend/server.js",
   "scripts": {
+    "build:frontend": "node scripts/build-frontend.js",
     "dev": "node --watch backend/server.js",
     "start": "node backend/server.js",
     "timeline:validate": "node scripts/validate-timeline-dataset.js",
     "timeline:import": "node scripts/import-timeline-dataset.js",
     "test": "node tests/mystery-country.test.js && node tests/session.test.js",
-    "test:auth": "node tests/email-auth.test.js"
+    "test:auth": "node tests/email-auth.test.js",
+    "test:shared": "node tests/shared-games.test.js",
+    "test:hosted": "node tests/email-auth.test.js --shared"
   },
   "dependencies": {
     "argon2": "^0.45.1",

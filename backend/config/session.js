@@ -27,7 +27,7 @@ const createSessionMiddleware = () => {
         cookie: {
             httpOnly: true,
             path: "/",
-            sameSite: isProduction ? "none" : "lax",
+            sameSite: isProduction && !process.env.VERCEL ? "none" : "lax",
             secure: isProduction
         }
     });

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm ci --omit=dev",
+  "buildCommand": "npm run build:frontend",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 300,
+      "includeFiles": "Dictionary.txt"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/v1/:path*", "destination": "/api/index" },
+    { "source": "/socket.io/:path*", "destination": "/api/index" }
+  ]
+}

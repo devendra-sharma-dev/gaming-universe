@@ -5,6 +5,7 @@
     // randomUUID requires a secure context; getRandomValues also works on local HTTP hosts.
     const randomToken = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, "0")).join("");
     const tabId = randomToken();
+    const connectionToken = randomToken();
     let channel = null;
     try {
         if (typeof BroadcastChannel === "function") channel = new BroadcastChannel(storageKey);
@@ -56,7 +57,7 @@
             headers.set("X-Browser-Session", token);
             return fetch(url, { ...options, headers, credentials: "include" });
         },
-        socketAuth: callback => { ready.then(() => callback({ browserToken: token })); },
+        socketAuth: callback => { ready.then(() => callback({ browserToken: token, connectionToken })); },
         identityChanged: () => channel?.postMessage({ type: "identity-changed" })
     };
 })();

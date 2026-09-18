@@ -10,18 +10,7 @@ const gameRoutes = require("./routes/games");
 const timelineRoutes = require("./routes/timeline");
 const mysteryCountryRoutes = require("./routes/mysteryCountry");
 
-const configuredFrontendOrigin = process.env.FRONTEND_ORIGIN;
-const developmentOrigins = new Set([
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://[::]:3000"
-]);
-
-const isAllowedOrigin = (origin) => {
-    if (!origin) return true;
-    if (configuredFrontendOrigin === origin) return true;
-    return process.env.NODE_ENV !== "production" && developmentOrigins.has(origin);
-};
+const { isAllowedOrigin } = require("./config/origins");
 
 const app = express();
 const sessionMiddleware = createSessionMiddleware();

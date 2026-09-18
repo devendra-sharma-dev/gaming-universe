@@ -11,6 +11,8 @@ const User = require("./models/User");
 const { Server } = require("socket.io");
 const { attachTicTacToe } = require("./realtime/ticTacToe");
 const { attachWordBomb } = require("./realtime/wordBomb");
+const { attachHostedGames } = require("./realtime/hosted");
+const { allowedOrigins, isAllowedOrigin } = require("./config/origins");
 const crypto = require("crypto");
 const OtpCode = require("./models/OtpCode");
 const { matchesBrowserSession } = require("./services/browserSession");
@@ -26,86 +28,106 @@ const createGuestName = () => {
 };
 
 const port = Number.parseInt(process.env.PORT, 10) || 5051;
-const socketOrigins = [
-    process.env.FRONTEND_ORIGIN || "http://localhost:3000",
-    ...(process.env.NODE_ENV === "production"
-        ? []
-        : ["http://localhost:3000", "http://127.0.0.1:3000", "http://[::]:3000"])
-];
-
-const startServer = async () => {
-    try {
-        await connectDatabase();
-        // Do not accept signups until the unique email/username indexes exist.
-        await Promise.all([User.init(), OtpCode.init()]);
-
-        const { app, sessionMiddleware } = require("./app");
-        const httpServer = http.createServer(app);
-
-        const io = new Server(httpServer, {
-            cors: {
-                origin: socketOrigins,
-                credentials: true
-            }
+const createGameServer = ({ shared = Boolean(process.env.VERCEL) } = {}) => {
+    let initialization;
+    let initializeGames = async () => {};
+    const ready = () => {
+        if (!initialization) initialization = (async () => {
+            await connectDatabase();
+            await Promise.all([User.init(), OtpCode.init()]);
+            if (process.env.VERCEL) await require("mongoose").connection.collection("authRateLimits")
+                .createIndex({ resetTime: 1 }, { expireAfterSeconds: 0 });
+            await initializeGames();
+        })().catch(error => { initialization = null; throw error; });
+        return initialization;
+    };
+    const { app, sessionMiddleware } = require("./app");
+    const httpServer = http.createServer((request, response) => {
+        ready().then(() => app(request, response)).catch(() => {
+            response.writeHead(503, { "Content-Type": "application/json" });
+            response.end(JSON.stringify({ success: false, error: { message: "Service temporarily unavailable." } }));
         });
+    });
 
-        io.engine.use(sessionMiddleware);
+    const io = new Server(httpServer, {
+        cors: {
+            origin: [...allowedOrigins],
+            credentials: true
+        },
+        maxHttpBufferSize: 16384,
+        allowRequest: (request, callback) => callback(null, isAllowedOrigin(request.headers.origin))
+    });
 
-        io.use(async (socket, next) => {
-            try {
-                const session = socket.request.session;
+    io.engine.use((request, response, next) => {
+        ready().then(() => sessionMiddleware(request, response, next)).catch(() => next(new Error("Service temporarily unavailable.")));
+    });
 
-                if (!session?.userId || !matchesBrowserSession(session, socket.handshake.auth.browserToken)) {
-                    socket.user = {
-                        id: `guest:${crypto.randomUUID()}`,
-                        username: createGuestName(),
-                        xp: 0,
-                        isGuest: true
-                    };
-                    next();
-                    return;
-                }
+    io.use(async (socket, next) => {
+        try {
+            const session = socket.request.session;
 
-                const user = await User.findById(session.userId).select(
-                    "username xp"
-                );
-
-                if (!user) {
-                    const error = new Error("Authentication required.");
-                    error.data = { code: "AUTH_REQUIRED" };
-                    next(error);
-                    return;
-                }
-
+            if (!session?.userId || !matchesBrowserSession(session, socket.handshake.auth.browserToken)) {
                 socket.user = {
-                    id: user._id.toString(),
-                    username: user.username,
-                    xp: user.xp,
-                    isGuest: false
+                    id: `guest:${crypto.randomUUID()}`,
+                    username: createGuestName(),
+                    xp: 0,
+                    isGuest: true
                 };
-
-                // A socket must not keep account access after another tab logs out.
-                socket.use((_packet, nextPacket) => {
-                    socket.request.session.reload((error) => {
-                        const current = socket.request.session;
-                        if (error || String(current?.userId) !== socket.user.id ||
-                            !matchesBrowserSession(current, socket.handshake.auth.browserToken)) {
-                            socket.emit("session:expired");
-                            socket.disconnect(true);
-                            return nextPacket(new Error("Authentication required."));
-                        }
-                        nextPacket();
-                    });
-                });
-
                 next();
-            } catch (_error) {
-                next(new Error("Socket authentication failed."));
+                return;
             }
-        });
 
+            const user = await User.findById(session.userId).select(
+                "username xp"
+            );
+
+            if (!user) {
+                const error = new Error("Authentication required.");
+                error.data = { code: "AUTH_REQUIRED" };
+                next(error);
+                return;
+            }
+
+            socket.user = {
+                id: user._id.toString(),
+                username: user.username,
+                xp: user.xp,
+                isGuest: false
+            };
+
+            // A socket must not keep account access after another tab logs out.
+            socket.use((_packet, nextPacket) => {
+                socket.request.session.reload((error) => {
+                    const current = socket.request.session;
+                    if (error || String(current?.userId) !== socket.user.id ||
+                        !matchesBrowserSession(current, socket.handshake.auth.browserToken)) {
+                        socket.emit("session:expired");
+                        socket.disconnect(true);
+                        return nextPacket(new Error("Authentication required."));
+                    }
+                    nextPacket();
+                });
+            });
+
+            next();
+        } catch (_error) {
+            next(new Error("Socket authentication failed."));
+        }
+    });
+
+    if (shared) initializeGames = attachHostedGames(io, ready);
+    else {
         attachTicTacToe(io);
         attachWordBomb(io);
+    }
+
+    return { httpServer, io, ready };
+};
+
+const startServer = async (options) => {
+    try {
+        const { httpServer, io, ready } = createGameServer(options);
+        await ready();
 
         httpServer.once("error", (error) => {
             if (error && error.code === "EADDRINUSE") {
@@ -133,3 +155,4 @@ if (require.main === module) {
 }
 
 module.exports = startServer;
+module.exports.createGameServer = createGameServer;
