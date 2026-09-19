@@ -10,7 +10,9 @@
     "start": "node backend/server.js",
     "timeline:validate": "node scripts/validate-timeline-dataset.js",
     "timeline:import": "node scripts/import-timeline-dataset.js",
-    "test": "node tests/mystery-country.test.js && node tests/session.test.js",
+    "estimate-it:validate": "node scripts/validate-estimate-it-dataset.js",
+    "estimate-it:import": "node scripts/import-estimate-it-dataset.js",
+    "test": "node tests/mystery-country.test.js && node tests/session.test.js && node tests/estimate-it.test.js && node tests/estimate-it-flow.test.js",
     "test:auth": "node tests/email-auth.test.js",
     "test:shared": "node tests/shared-games.test.js",
     "test:hosted": "node tests/email-auth.test.js --shared"
