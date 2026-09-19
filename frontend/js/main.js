@@ -9,6 +9,11 @@ document.addEventListener("DOMContentLoaded", () => {
         window.location.replace("./mystery-country.html");
         return;
     }
+    /* Estimate It */
+    if (new URLSearchParams(window.location.search).get("game") === "estimate-it") {
+        window.location.replace("./estimate-it.html");
+        return;
+    }
     const API_ORIGIN = window.GamingSession.apiOrigin;
     const API = `${API_ORIGIN}/api/v1`;
     const navigation = document.querySelector(".main-navigation");
@@ -41,7 +46,8 @@ document.addEventListener("DOMContentLoaded", () => {
         { id: "001", slug: "tic-tac-toe", title: "Tic Tac Toe", type: "STRATEGY / 2 PLAYERS", status: "LIVE" },
         { id: "002", slug: "word-bomb", title: "Word Bomb", type: "WORD / REALTIME ARENA", status: "LIVE" },
         { id: "003", slug: "timeline", title: "Timeline", type: "KNOWLEDGE / DAILY CHALLENGE", status: "DAILY" },
-        { id: "004", slug: "mystery-country", title: "Mystery Country", type: "GEOGRAPHY / DAILY CHALLENGE", status: "DAILY" }
+        { id: "004", slug: "mystery-country", title: "Mystery Country", type: "GEOGRAPHY / DAILY CHALLENGE", status: "DAILY" },
+        { id: "005", slug: "estimate-it", title: "Estimate It", type: "ESTIMATION / DAILY CHALLENGE", status: "DAILY" } /* Estimate It */
     ];
 
     const renderLibrary = () => {

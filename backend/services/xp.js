@@ -58,7 +58,34 @@ const awardTicTacToeWinXp = async ({ matchId, userId }) => {
     return totalXp;
 };
 
+/* Estimate It ──────────────────────────────────────────── */
+
+const EstimateItAttempt = require("../models/EstimateItAttempt");
+
+const awardEstimateItXp = async ({ attemptId, userId, xpAmount }) => {
+    if (!xpAmount || xpAmount <= 0) return null;
+
+    const claimed = await EstimateItAttempt.findOneAndUpdate(
+        { _id: attemptId, userId, status: "completed", xpAwarded: false },
+        { $set: { xpAwarded: true } },
+        { new: true }
+    );
+
+    if (!claimed) return null;
+
+    const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        { $inc: { xp: xpAmount } },
+        { new: true }
+    ).select("xp");
+
+    if (!updatedUser) throw new Error("User account no longer exists.");
+
+    return updatedUser.xp;
+};
+
 module.exports = {
     TIC_TAC_TOE_WIN_XP,
-    awardTicTacToeWinXp
+    awardTicTacToeWinXp,
+    awardEstimateItXp /* Estimate It */
 };

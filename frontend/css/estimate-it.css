@@ -1,0 +1,235 @@
+/* =========================================================
+   ESTIMATE IT — Game Styles
+   Follows mystery-country.css conventions
+   ========================================================= */
+
+.estimate-page{min-height:100vh;color:#fff;background:radial-gradient(circle at 25% 12%,rgba(0,200,255,.14),transparent 35%),#02070d}
+.estimate-page .main-navigation{position:fixed;z-index:5;top:0;left:50%}
+
+/* ── Screen Red Boundary Alert (Under 10s) ────────────────── */
+
+.ei-critical-vignette{position:fixed;inset:0;z-index:9990;pointer-events:none;opacity:0;transition:opacity .6s ease}
+.ei-critical-vignette.is-active{opacity:1;animation:eiVignettePulse 2.4s ease-in-out infinite}
+@keyframes eiVignettePulse{
+    0%,100%{box-shadow:inset 0 0 60px rgba(255,20,40,.22),inset 0 0 15px rgba(255,0,0,.3)}
+    50%{box-shadow:inset 0 0 95px rgba(255,20,40,.42),inset 0 0 25px rgba(255,0,0,.5)}
+}
+
+/* ── Shell & Heading ─────────────────────────────────────── */
+
+.ei-shell{width:min(720px,calc(100% - 40px));margin:auto;padding:140px 0 80px}
+.ei-heading{display:flex;justify-content:space-between;gap:24px;align-items:end}
+.ei-heading h1{margin:12px 0;font-size:clamp(44px,7.5vw,88px);line-height:.82;letter-spacing:-.08em}
+.ei-heading h1 span{color:var(--color-cyan)}
+.ei-heading p{color:rgba(255,255,255,.65);font-size:14px;max-width:340px}
+.ei-date{padding:14px 18px;border-right:2px solid var(--color-cyan);text-align:right;flex-shrink:0}
+.ei-date span,.ei-date small{display:block;font-size:9px;font-weight:900;letter-spacing:.18em}
+.ei-date strong{display:block;margin:6px 0;color:var(--color-cyan)}
+.ei-game{margin-top:26px;padding:28px;min-height:460px}
+
+/* ── Professional Game Briefing Screen ───────────────────── */
+
+.ei-welcome{text-align:center;padding:10px 0;animation:eiFadeIn .4s ease both}
+.ei-hero-banner{position:relative;width:100%;border-radius:16px;overflow:hidden;margin-bottom:24px;border:1px solid rgba(0,200,255,.28);box-shadow:0 14px 40px rgba(0,0,0,.6)}
+.ei-hero-img{width:100%;height:auto;display:block;aspect-ratio:16/9;object-fit:cover}
+.ei-hero-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(2,7,13,.95) 0%,rgba(2,7,13,.4) 50%,transparent 100%);display:flex;flex-direction:column;justify-content:flex-end;padding:24px;text-align:left}
+.ei-hero-tag{font-size:10px;font-weight:900;letter-spacing:.22em;color:var(--color-cyan);margin-bottom:6px;text-transform:uppercase}
+.ei-hero-title{font-size:clamp(22px,4vw,34px);font-weight:900;letter-spacing:-.04em;color:#fff;line-height:1}
+
+.ei-welcome-lead{font-size:15px;line-height:1.6;color:rgba(255,255,255,.8);max-width:580px;margin:0 auto 28px}
+
+.ei-steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:26px;text-align:left}
+.ei-step-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:18px;position:relative;transition:all var(--transition-fast)}
+.ei-step-card:hover{border-color:rgba(0,200,255,.3);background:rgba(0,200,255,.04);transform:translateY(-2px)}
+.ei-step-icon{font-size:26px;margin-bottom:8px}
+.ei-step-num{font-size:9px;font-weight:900;letter-spacing:.18em;color:var(--color-cyan);margin-bottom:4px}
+.ei-step-card h3{font-size:16px;font-weight:900;letter-spacing:-.02em;margin-bottom:6px;color:#fff}
+.ei-step-card p{font-size:12px;line-height:1.5;color:rgba(255,255,255,.65)}
+
+.ei-tiers-strip{background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:14px;margin-bottom:28px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.ei-tiers-label{font-size:10px;font-weight:900;letter-spacing:.15em;color:var(--color-cyan);flex-shrink:0}
+.ei-tier-pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.ei-tier-pill{padding:5px 10px;border-radius:8px;font-size:11px;font-weight:700;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}
+.ei-tier-pill strong{font-weight:900;margin-left:3px}
+.ei-tier-pill.p-5x{background:rgba(255,215,0,.12);border-color:rgba(255,215,0,.35);color:#ffd700}
+.ei-tier-pill.p-3x{background:rgba(255,107,107,.12);border-color:rgba(255,107,107,.35);color:#ff6b6b}
+.ei-tier-pill.p-2x{background:rgba(0,200,255,.12);border-color:rgba(0,200,255,.35);color:var(--color-cyan)}
+.ei-tier-pill.p-1x{background:rgba(255,255,255,.08);color:#fff}
+.ei-tier-pill.p-0x{background:rgba(255,255,255,.03);color:rgba(255,255,255,.4)}
+
+.ei-start-btn{display:inline-block;padding:18px 48px;font-size:17px;font-weight:900;letter-spacing:.08em;color:#000;background:linear-gradient(135deg,#00c8ff,#5ce1e6);border:none;border-radius:14px;cursor:pointer;box-shadow:0 8px 25px rgba(0,200,255,.4);transition:all var(--transition-fast)}
+.ei-start-btn:hover{background:#fff;transform:translateY(-2px);box-shadow:0 12px 35px rgba(0,200,255,.6)}
+
+.ei-welcome-meta{display:flex;justify-content:center;gap:12px;margin-top:16px;font-size:11px;font-weight:800;letter-spacing:.12em;color:rgba(255,255,255,.45);text-transform:uppercase}
+
+/* ── Round Bar ───────────────────────────────────────────── */
+
+.ei-roundbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:12px}
+.ei-roundbar-left{display:flex;flex-direction:column;gap:4px}
+.ei-round-label{font-size:10px;font-weight:900;letter-spacing:.18em;color:var(--color-cyan)}
+.ei-round-title{font-size:26px;font-weight:900;letter-spacing:-.04em}
+.ei-chips-badge{display:flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(255,207,85,.08);border:1px solid rgba(255,207,85,.3);border-radius:10px;font-weight:900;font-size:16px;color:#ffcf55}
+
+/* ── Gamified Timer HUD ──────────────────────────────────── */
+
+.ei-timer-hud{display:flex;align-items:center;gap:16px;background:linear-gradient(135deg,rgba(4,20,38,.85),rgba(2,10,20,.85));border:1px solid rgba(0,200,255,.28);border-radius:14px;padding:10px 18px;margin-bottom:24px;box-shadow:0 8px 30px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.1);transition:all .4s ease}
+.ei-timer-hud.is-urgent{border-color:rgba(255,60,70,.6);background:linear-gradient(135deg,rgba(35,8,14,.92),rgba(15,3,6,.92));box-shadow:0 0 20px rgba(255,40,60,.25),inset 0 0 10px rgba(255,40,60,.12)}
+.ei-timer-gauge{position:relative;width:44px;height:44px;flex-shrink:0;display:grid;place-items:center}
+.ei-timer-ring{width:44px;height:44px;transform:rotate(-90deg)}
+.ei-timer-ring-bg{fill:none;stroke:rgba(255,255,255,.1);stroke-width:3.5}
+.ei-timer-ring-progress{fill:none;stroke:var(--color-cyan);stroke-width:3.5;stroke-linecap:round;stroke-dasharray:113.1;stroke-dashoffset:0;transition:stroke-dashoffset .4s linear,stroke .3s ease}
+.ei-timer-hud.is-urgent .ei-timer-ring-progress{stroke:#ff3b50}
+.ei-timer-icon{position:absolute;font-size:16px}
+.ei-timer-info{flex-shrink:0}
+.ei-timer-tag{display:block;font-size:8px;font-weight:900;letter-spacing:.2em;color:var(--color-cyan)}
+.ei-timer-hud.is-urgent .ei-timer-tag{color:#ff6b6b}
+.ei-timer-countdown{font-family:'Courier New',Courier,monospace;font-size:20px;font-weight:900;color:#fff;letter-spacing:1px}
+.ei-timer-hud.is-urgent .ei-timer-countdown{color:#ff4455;text-shadow:0 0 12px rgba(255,68,85,.8)}
+.ei-timer-meter-wrap{flex:1;min-width:0;position:relative}
+.ei-timer-meter-track{height:8px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.1);border-radius:4px;overflow:hidden;position:relative}
+.ei-timer-meter-fill{height:100%;background:linear-gradient(90deg,var(--color-cyan),#5ce1e6);border-radius:3px;transition:width .4s linear,background .3s ease}
+.ei-timer-hud.is-urgent .ei-timer-meter-fill{background:linear-gradient(90deg,#ff8844,#ff3b50)}
+@keyframes eiTimerThrob{0%,100%{transform:scale(1)}50%{transform:scale(1.02)}}
+
+/* ── Question ────────────────────────────────────────────── */
+
+.ei-category{display:inline-block;padding:5px 12px;background:rgba(0,200,255,.1);border:1px solid rgba(0,200,255,.25);border-radius:20px;font-size:10px;font-weight:900;letter-spacing:.15em;color:var(--color-cyan);margin-bottom:16px}
+.ei-question{font-size:clamp(18px,3.5vw,26px);line-height:1.35;font-weight:700;text-align:center;padding:0 10px;margin-bottom:24px;min-height:72px}
+
+/* ── Input ───────────────────────────────────────────────── */
+
+.ei-input-wrap{max-width:360px;margin:0 auto 8px}
+.ei-input-label{display:block;font-size:9px;font-weight:900;letter-spacing:.18em;color:var(--color-cyan);margin-bottom:8px;text-align:center}
+.ei-estimate-input{width:100%;padding:16px 18px;font-size:24px;font-weight:700;text-align:center;color:#fff;background:rgba(0,0,0,.35);border:2px solid rgba(0,200,255,.3);border-radius:12px;outline:none;transition:border-color var(--transition-fast)}
+.ei-estimate-input:focus{border-color:var(--color-cyan);box-shadow:0 0 20px rgba(0,200,255,.15)}
+.ei-estimate-input::placeholder{color:rgba(255,255,255,.25);font-weight:400;font-size:18px}
+.ei-unit-hint{text-align:center;font-size:12px;color:rgba(255,255,255,.45);margin-top:6px}
+
+/* ── Bet Slider ──────────────────────────────────────────── */
+
+.ei-bet-section{margin:24px 0;padding:20px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px}
+.ei-bet-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.ei-bet-label{font-size:9px;font-weight:900;letter-spacing:.18em;color:var(--color-cyan)}
+.ei-bet-value{font-size:22px;font-weight:900;color:#ffcf55}
+.ei-bet-slider{width:100%;height:8px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,.12);border-radius:4px;outline:none;cursor:pointer}
+.ei-bet-slider::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;background:#ffcf55;border:3px solid #fff;border-radius:50%;cursor:grab;box-shadow:0 0 12px rgba(255,207,85,.4)}
+.ei-bet-slider::-moz-range-thumb{width:24px;height:24px;background:#ffcf55;border:3px solid #fff;border-radius:50%;cursor:grab}
+.ei-bet-range{display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.4);margin-top:4px}
+.ei-bet-remaining{text-align:center;margin-top:10px;font-size:13px;color:rgba(255,255,255,.55)}
+.ei-bet-remaining strong{color:#ffcf55}
+.ei-final-bet{text-align:center;padding:16px;background:rgba(255,68,68,.08);border:1px solid rgba(255,68,68,.3);border-radius:12px}
+.ei-final-bet .ei-final-tag{display:block;font-size:11px;font-weight:900;letter-spacing:.15em;color:#ff6b6b;margin-bottom:8px}
+.ei-final-bet .ei-final-amount{font-size:28px;font-weight:900;color:#ffcf55}
+
+/* ── Submit Button ───────────────────────────────────────── */
+
+.ei-submit{display:block;width:100%;max-width:320px;margin:22px auto 0;padding:16px 28px;font-size:16px;font-weight:900;letter-spacing:.08em;color:#000;background:#fff;border:none;border-radius:12px;cursor:pointer;transition:all var(--transition-fast)}
+.ei-submit:hover{background:var(--color-cyan);transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,200,255,.3)}
+.ei-submit:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* ── Reveal Screen (XP Hidden until final screen) ───────── */
+
+.ei-reveal{text-align:center;padding:24px 10px;animation:eiFadeIn .35s ease both}
+.ei-reveal-row{margin:18px 0}
+.ei-reveal-label{display:block;font-size:9px;font-weight:900;letter-spacing:.2em;color:rgba(255,255,255,.5);margin-bottom:6px}
+.ei-reveal-estimate{font-size:28px;font-weight:900;color:rgba(255,255,255,.75)}
+.ei-reveal-answer{font-size:34px;font-weight:900;color:var(--color-cyan);animation:eiPopIn .4s .3s ease both}
+.ei-reveal-error{font-size:20px;font-weight:700;color:rgba(255,255,255,.85);margin-top:4px;animation:eiFadeIn .3s .6s ease both}
+.ei-reveal-tier{font-size:42px;font-weight:900;margin:18px 0 10px;animation:eiPopIn .4s .8s ease both}
+.ei-reveal-details{display:flex;gap:14px;justify-content:center;margin:18px 0;flex-wrap:wrap;animation:eiFadeIn .3s 1s ease both}
+.ei-reveal-detail{padding:12px 18px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;text-align:center;min-width:100px}
+.ei-reveal-detail small{display:block;font-size:9px;letter-spacing:.12em;color:rgba(255,255,255,.5)}
+.ei-reveal-detail strong{display:block;margin-top:4px;font-size:20px}
+.ei-reveal-chips{margin-top:16px;font-size:14px;color:rgba(255,255,255,.5);animation:eiFadeIn .3s 1.2s ease both}
+.ei-reveal-chips strong{color:#ffcf55}
+
+.ei-next{display:inline-block;margin-top:22px;padding:14px 36px;font-size:15px;font-weight:900;letter-spacing:.06em;color:#000;background:#fff;border:none;border-radius:10px;cursor:pointer;transition:all var(--transition-fast);animation:eiFadeIn .3s 1.3s ease both}
+.ei-next:hover{background:var(--color-cyan);transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,200,255,.25)}
+
+/* ── Final Summary ───────────────────────────────────────── */
+
+.ei-summary{text-align:center;padding:30px 10px;animation:eiFadeIn .4s ease both}
+.ei-summary-kicker{display:block;font-size:9px;font-weight:900;letter-spacing:.24em;color:var(--color-cyan);margin-bottom:8px}
+.ei-summary h2{font-size:clamp(28px,5vw,42px);font-weight:900;letter-spacing:-.06em;margin-bottom:6px}
+
+/* ── Funky Final Rank Badges ── */
+.ei-rank-badge{display:inline-flex;align-items:center;gap:14px;margin:16px auto;padding:12px 24px;border-radius:16px;background:rgba(255,255,255,.05);border:2px solid rgba(255,255,255,.15);text-align:left;animation:eiPopIn .5s cubic-bezier(.175,.885,.32,1.275) both}
+.ei-rank-emoji{font-size:32px;line-height:1}
+.ei-rank-text{display:flex;flex-direction:column}
+.ei-rank-title{font-size:20px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+.ei-rank-desc{font-size:11px;letter-spacing:.05em;color:rgba(255,255,255,.6);margin-top:2px}
+
+/* Tier 5: Cosmic Oracle (500 XP - Max Available) */
+.ei-rank-badge.rank-cosmic{background:linear-gradient(135deg,rgba(255,215,0,.15),rgba(0,200,255,.2));border-color:#ffd700;box-shadow:0 0 30px rgba(255,215,0,.4),0 0 60px rgba(0,200,255,.2)}
+.ei-rank-badge.rank-cosmic .ei-rank-title{color:#ffd700;text-shadow:0 0 16px rgba(255,215,0,.6)}
+
+/* Tier 4: Giga Brain (350 - 499 XP) */
+.ei-rank-badge.rank-giga{background:linear-gradient(135deg,rgba(0,200,255,.16),rgba(147,51,234,.16));border-color:var(--color-cyan);box-shadow:0 0 25px rgba(0,200,255,.3)}
+.ei-rank-badge.rank-giga .ei-rank-title{color:var(--color-cyan);text-shadow:0 0 12px rgba(0,200,255,.5)}
+
+/* Tier 3: Sharp Shooter (200 - 349 XP) */
+.ei-rank-badge.rank-sharp{background:linear-gradient(135deg,rgba(255,180,0,.14),rgba(255,100,0,.1));border-color:#ffb400;box-shadow:0 0 20px rgba(255,180,0,.25)}
+.ei-rank-badge.rank-sharp .ei-rank-title{color:#ffc83b}
+
+/* Tier 2: Ballpark Bandit (75 - 199 XP) */
+.ei-rank-badge.rank-bandit{background:linear-gradient(135deg,rgba(16,185,129,.14),rgba(5,150,105,.1));border-color:#10b981;box-shadow:0 0 18px rgba(16,185,129,.2)}
+.ei-rank-badge.rank-bandit .ei-rank-title{color:#34d399}
+
+/* Tier 1: Potato Brain (0 - 74 XP) */
+.ei-rank-badge.rank-potato{background:linear-gradient(135deg,rgba(239,68,68,.14),rgba(185,28,28,.1));border-color:#ef4444;box-shadow:0 0 18px rgba(239,68,68,.2)}
+.ei-rank-badge.rank-potato .ei-rank-title{color:#f87171}
+
+.ei-summary-total{font-size:46px;font-weight:900;color:var(--color-cyan);margin:14px 0}
+.ei-summary-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-width:380px;margin:20px auto}
+.ei-summary-stat{padding:14px;background:rgba(0,200,255,.06);border:1px solid rgba(0,200,255,.18);border-radius:12px}
+.ei-summary-stat small{display:block;font-size:9px;letter-spacing:.12em;color:var(--color-cyan)}
+.ei-summary-stat strong{display:block;margin-top:6px;font-size:18px}
+.ei-summary-rounds{max-width:400px;margin:24px auto;text-align:left}
+.ei-summary-round{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.06)}
+.ei-summary-round:last-child{border-bottom:none}
+.ei-summary-round span:first-child{font-size:13px;color:rgba(255,255,255,.6)}
+.ei-summary-round span:last-child{font-weight:900;font-size:15px}
+.ei-comeback{margin-top:24px;color:rgba(255,255,255,.45);font-size:13px}
+.ei-home-link{display:inline-block;margin-top:16px;padding:12px 28px;font-size:14px;font-weight:900;color:#000;background:var(--color-cyan);border-radius:10px;text-decoration:none;transition:all var(--transition-fast)}
+.ei-home-link:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,200,255,.25)}
+
+/* ── Error ───────────────────────────────────────────────── */
+
+.ei-error{text-align:center;padding:60px 20px}
+.ei-error p{color:rgba(255,255,255,.6);font-size:14px;margin-top:10px}
+
+/* ── In-Game Toast Notifications ────────────────────────── */
+
+.ei-toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(15,22,34,.96);border:1px solid rgba(255,68,68,.6);color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:700;box-shadow:0 12px 36px rgba(0,0,0,.6),0 0 20px rgba(255,68,68,.3);z-index:9999;opacity:0;pointer-events:none;transition:all .3s cubic-bezier(.16,1,.3,1)}
+.ei-toast.is-visible{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+.ei-toast.is-info{border-color:rgba(0,200,255,.6);box-shadow:0 12px 36px rgba(0,0,0,.6),0 0 20px rgba(0,200,255,.3)}
+
+/* ── Animations ──────────────────────────────────────────── */
+
+@keyframes eiFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes eiPopIn{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
+
+/* ── Responsive ──────────────────────────────────────────── */
+
+@media(max-width:700px){
+    .ei-shell{width:calc(100% - 24px);padding-top:115px}
+    .ei-heading{display:block}
+    .ei-date{margin-top:18px;text-align:left;border-right:0;border-left:2px solid var(--color-cyan)}
+    .ei-game{padding:18px}
+    .ei-roundbar{flex-wrap:wrap}
+    .ei-question{font-size:clamp(16px,4vw,22px)}
+    .ei-reveal-tier{font-size:32px}
+    .ei-summary-stats{grid-template-columns:1fr 1fr}
+}
+@media(max-width:400px){
+    .ei-welcome .ei-rules{flex-direction:column;align-items:center}
+    .ei-summary-stats{grid-template-columns:1fr}
+    .ei-reveal-details{flex-direction:column;align-items:center}
+    .ei-timer-hud{gap:10px;padding:8px 12px}
+    .ei-timer-countdown{font-size:17px}
+}
+
+/* ── Reduced motion ──────────────────────────────────────── */
+@media(prefers-reduced-motion:reduce){
+    *{animation-duration:0.01ms!important;transition-duration:0.01ms!important}
+}

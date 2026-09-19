@@ -49,6 +49,8 @@ const createGameServer = ({ shared = Boolean(process.env.VERCEL) } = {}) => {
             response.end(JSON.stringify({ success: false, error: { message: "Service temporarily unavailable." } }));
         });
     });
+    httpServer.keepAliveTimeout = 65000;
+    httpServer.headersTimeout = 66000;
 
     const io = new Server(httpServer, {
         cors: {

@@ -23,7 +23,8 @@ const games = [
         status: "active",
         entryPoint: "/timeline.html"
     },
-    { id: "004", slug: "mystery-country", title: "Mystery Country", multiplayer: false, status: "daily", entryPoint: "/mystery-country.html" }
+    { id: "004", slug: "mystery-country", title: "Mystery Country", multiplayer: false, status: "daily", entryPoint: "/mystery-country.html" },
+    { id: "005", slug: "estimate-it", title: "Estimate It", multiplayer: false, status: "daily", entryPoint: "/estimate-it.html" } /* Estimate It */
 ];
 
 const getGame = (slug) => games.find((game) => game.slug === slug) || null;
