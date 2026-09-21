@@ -8,9 +8,16 @@ const timelineEventSchema = new mongoose.Schema({
         type: String,
         required: true,
         enum: ["Science", "Sports", "Technology", "History", "Geography", "Entertainment", "Nature", "Space", "Business", "General Knowledge", "Music", "Movies", "World"],
+        enum: [
+            "Science", "Sports", "Technology", "History", "Geography", "Entertainment",
+            "Nature", "Space", "Business", "General Knowledge", "Music", "Movies", "World",
+            "Architecture", "Exploration", "Politics", "Literature", "Military", "Inventions",
+            "Medicine & Health", "Culture", "Environment"
+        ],
         index: true
     },
     popularity: { type: String, enum: ["high", "medium", "discovery"], default: "medium", index: true },
+    popularity: { type: String, enum: ["high", "medium", "low", "discovery"], default: "medium", index: true },
     usedInDailyGame: { type: Boolean, default: false, index: true },
     usedInGameDate: { type: String, default: null, index: true }
 }, { timestamps: true });
