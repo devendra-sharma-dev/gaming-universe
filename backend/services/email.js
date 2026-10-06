@@ -18,9 +18,6 @@ const createEmailTransport = () => {
     return nodemailer.createTransport({
         host: SMTP_HOST, port, secure: port === 465, requireTLS: port !== 465,
         auth: { user: SMTP_USER, pass: SMTP_PASS },
-        tls: {
-            rejectUnauthorized: process.env.NODE_ENV === "production"
-        },
         connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 15000
     });
 };
