@@ -3,8 +3,7 @@ const path = require("path");
 
 
 require("dotenv").config({
-    path: path.resolve(__dirname, "../.env"),
-    override: true
+    path: path.resolve(__dirname, "../.env")
 });
 
 const connectDatabase = require("./config/database");
