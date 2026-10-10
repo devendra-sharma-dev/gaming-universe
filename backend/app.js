@@ -10,6 +10,7 @@ const gameRoutes = require("./routes/games");
 const timelineRoutes = require("./routes/timeline");
 const mysteryCountryRoutes = require("./routes/mysteryCountry");
 const estimateItRoutes = require("./routes/estimateIt"); /* Estimate It */
+const miniOlympicsRoutes = require("./routes/miniOlympics");
 
 const { isAllowedOrigin } = require("./config/origins");
 
@@ -67,6 +68,7 @@ app.use("/api/v1/games", gameRoutes);
 app.use("/api/v1/timeline", timelineRoutes);
 app.use("/api/v1/mystery-country", mysteryCountryRoutes);
 app.use("/api/v1/estimate-it", estimateItRoutes); /* Estimate It */
+app.use("/api/v1/mini-olympics", miniOlympicsRoutes);
 
 app.use((_request, response) => {
     response.status(404).json({

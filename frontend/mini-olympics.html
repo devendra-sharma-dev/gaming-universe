@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Olympics | Gaming Universe</title>
+    <link rel="stylesheet" href="./css/main.css?v=email-otp-20260915-4">
+    <link rel="stylesheet" href="./css/mini-olympics.css?v=olympics-1">
+    <script src="./js/session.js?v=email-otp-20260915-4"></script>
+</head>
+<body class="olympics-page">
+
+    <!-- GLOBAL NAVIGATION -->
+    <header class="main-navigation">
+        <a class="brand" href="./index.html" aria-label="Gaming Universe Home">
+            <span class="brand-controller" aria-hidden="true">
+                <span class="controller-body">
+                    <span class="controller-stick controller-stick-left"></span>
+                    <span class="controller-stick controller-stick-right"></span>
+                    <span class="controller-dpad"></span>
+                    <span class="controller-buttons">
+                        <span></span><span></span><span></span><span></span>
+                    </span>
+                </span>
+            </span>
+            <span class="brand-name">GAMING <strong>UNIVERSE</strong></span>
+        </a>
+
+        <div class="navigation-search" role="search">
+            <input id="game-search" type="search" placeholder="SEARCH GAMES" autocomplete="off" aria-label="Search games">
+            <div id="game-search-results" class="game-search-results" hidden></div>
+        </div>
+
+        <nav class="navigation-links" aria-label="Main Navigation">
+            <a class="navigation-link" href="./index.html">HOME</a>
+            <a class="navigation-link active" href="./mini-olympics.html">OLYMPICS</a>
+        </nav>
+
+        <div class="navigation-player" id="player-menu-button" role="button" tabindex="0" aria-label="Open account panel">
+            <span class="player-status" aria-hidden="true"></span>
+            <span class="player-name" id="mo-player-name">GUEST</span>
+        </div>
+    </header>
+
+    <main class="mo-shell">
+
+        <!-- SCREEN 1: LANDING PAGE -->
+        <section id="screen-landing" class="mo-screen active">
+            <div class="mo-panel mo-landing-panel">
+                <!-- HERO BANNER -->
+                <div class="mo-hero-banner">
+                    <img class="mo-hero-img" src="./assets/mini-olympics-hero.jpg" alt="Mini Olympics Championship" />
+                    <div class="mo-hero-overlay">
+                        <span class="mo-hero-tag">GAME #006 / 5-EVENT WORLD CHAMPIONSHIP</span>
+                        <h1 class="mo-hero-title">MINI <span>OLYMPICS</span></h1>
+                        <p class="mo-hero-subtitle">REPRESENT YOUR NATION • COMPETE AGAINST 15 RIVALS • CLAIM OLYMPIC GOLD</p>
+                    </div>
+                </div>
+
+                <p class="mo-welcome-lead">
+                    Step onto the international stage! Represent any of the <strong>197 sovereign countries worldwide</strong> and face off against <strong>15 formidable sports powerhouses</strong> across 5 core Olympic events. Master timing, reflexes, and precision to stand on top of the podium!
+                </p>
+
+                <!-- 3 STEPS HOW IT WORKS -->
+                <div class="mo-steps-grid">
+                    <div class="mo-step-card">
+                        <div class="mo-step-icon">🌍</div>
+                        <div class="mo-step-num">STEP 01</div>
+                        <h3>SELECT NATION</h3>
+                        <p>Pick any country on Earth. 15 elite rival nations are drawn to form your official 16-nation Olympic lineup.</p>
+                    </div>
+                    <div class="mo-step-card">
+                        <div class="mo-step-icon">⚡</div>
+                        <div class="mo-step-num">STEP 02</div>
+                        <h3>5 DISCIPLINES</h3>
+                        <p>Compete in Archery, 100m Sprint, Table Tennis, Weightlifting, and Fencing with authentic skill-based sports mechanics.</p>
+                    </div>
+                    <div class="mo-step-card">
+                        <div class="mo-step-icon">🥇</div>
+                        <div class="mo-step-num">STEP 03</div>
+                        <h3>PODIUM MEDALS</h3>
+                        <p>Gold, Silver, and Bronze medals are awarded after each event. Standings follow official Olympic order (Golds first).</p>
+                    </div>
+                </div>
+
+                <!-- 5 EVENTS PREVIEW -->
+                <div class="mo-section-heading">
+                    <span class="mo-section-tag">OLYMPIC DISCIPLINES</span>
+                    <h3>5 SKILL-BASED EVENTS</h3>
+                </div>
+
+                <div class="mo-events-preview">
+                    <div class="mo-event-card">
+                        <span class="mo-event-num">EVENT 01</span>
+                        <span class="mo-event-icon">🎯</span>
+                        <strong class="mo-event-name">Archery</strong>
+                        <span class="mo-event-focus">Precision Crosswind Aiming</span>
+                    </div>
+                    <div class="mo-event-card">
+                        <span class="mo-event-num">EVENT 02</span>
+                        <span class="mo-event-icon">🏃</span>
+                        <strong class="mo-event-name">100m Sprint</strong>
+                        <span class="mo-event-focus">Reaction Start &amp; Cadence Rhythm</span>
+                    </div>
+                    <div class="mo-event-card">
+                        <span class="mo-event-num">EVENT 03</span>
+                        <span class="mo-event-icon">🏓</span>
+                        <strong class="mo-event-name">Table Tennis</strong>
+                        <span class="mo-event-focus">16-Nation Knockout Tournament</span>
+                    </div>
+                    <div class="mo-event-card">
+                        <span class="mo-event-num">EVENT 04</span>
+                        <span class="mo-event-icon">🏋️</span>
+                        <strong class="mo-event-name">Weightlifting</strong>
+                        <span class="mo-event-focus">9 Progressive Levels &amp; Barbell Control</span>
+                    </div>
+                    <div class="mo-event-card">
+                        <span class="mo-event-num">EVENT 05</span>
+                        <span class="mo-event-icon">🤺</span>
+                        <strong class="mo-event-name">Fencing</strong>
+                        <span class="mo-event-focus">Tactical Duel &amp; Reflex Defense</span>
+                    </div>
+                </div>
+
+                <!-- MEDAL RULES STRIP -->
+                <div class="mo-landing-info">
+                    <span class="info-icon">🏅</span>
+                    <p>
+                        <strong>Official Olympic Protocol:</strong> Exactly 15 medals (5 Gold, 5 Silver, 5 Bronze) are awarded across the 5 events. Standings strictly follow standard Olympic medal sorting: Most Golds first, then Silvers, then Bronzes.
+                    </p>
+                </div>
+
+                <!-- ACTION BUTTON -->
+                <div style="text-align: center; margin: 24px 0 16px;">
+                    <button id="btn-to-country-select" class="mo-btn mo-btn-gold mo-action-large" type="button">
+                        START COMPETITION <span>➔</span>
+                    </button>
+                </div>
+
+                <!-- WELCOME META FOOTER STRIP -->
+                <div class="mo-welcome-meta">
+                    <span>5 OLYMPIC DISCIPLINES</span>
+                    <span>•</span>
+                    <span>16 WORLD NATIONS</span>
+                    <span>•</span>
+                    <span>AUTHENTIC SPORTS SCORING</span>
+                    <span>•</span>
+                    <span>LIVE PODIUM CEREMONY</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 2: COUNTRY SELECTION -->
+        <section id="screen-country-select" class="mo-screen">
+            <div class="mo-panel">
+                <div class="mo-header">
+                    <div>
+                        <span class="mo-kicker">STEP 1 OF 2 / NATION SELECTION</span>
+                        <h2 class="mo-title">CHOOSE YOUR <span>COUNTRY</span></h2>
+                        <p class="mo-desc">
+                            Select any recognized country in the world to represent. 15 elite global rivals will be drawn to complete the 16-nation Olympic tournament.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mo-select-wrapper">
+                    <div class="mo-search-box">
+                        <span class="mo-search-icon" aria-hidden="true">🔍</span>
+                        <input id="mo-country-search" class="mo-search-input" type="search" placeholder="Search by country name (e.g., India, Brazil, Japan, France, Kenya)..." autocomplete="off" aria-label="Search countries">
+                    </div>
+
+                    <div id="mo-countries-grid" class="mo-countries-grid" role="listbox" aria-label="Countries list">
+                        <!-- Populated dynamically via JS -->
+                    </div>
+
+                    <div id="mo-selected-banner" class="mo-selected-banner" hidden>
+                        <div class="mo-selected-details">
+                            <span id="mo-selected-flag" class="mo-flag">🏳️</span>
+                            <div class="mo-selected-text">
+                                <strong id="mo-selected-name">No Country Selected</strong>
+                                <small id="mo-selected-note">You are representing this nation. 15 rival countries will compete against you.</small>
+                            </div>
+                        </div>
+
+                        <button id="btn-start-games" class="mo-btn mo-btn-gold" type="button" disabled>
+                            CONFIRM &amp; ENTER ARENA <span>➔</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 3: EVENT INTRO -->
+        <section id="screen-event-intro" class="mo-screen">
+            <div class="mo-panel">
+                <div class="mo-intro-box">
+                    <span id="intro-event-badge" class="mo-intro-badge">EVENT 1 OF 5</span>
+                    <div id="intro-event-icon" class="mo-intro-icon">🎯</div>
+                    <h2 id="intro-event-title" class="mo-intro-title">ARCHERY</h2>
+                    <p id="intro-event-focus" class="mo-intro-focus">PRECISION &amp; TARGET AIMING</p>
+
+                    <div id="intro-event-rules" class="mo-intro-rules">
+                        <!-- Populated dynamically -->
+                    </div>
+
+                    <div id="intro-event-controls" class="mo-intro-controls">
+                        <!-- Populated dynamically -->
+                    </div>
+
+                    <button id="btn-begin-gameplay" class="mo-btn mo-btn-gold mo-action-large" type="button">
+                        BEGIN EVENT <span>➔</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 4: GAMEPLAY ARENA -->
+        <section id="screen-gameplay" class="mo-screen">
+            <div class="mo-panel mo-arena">
+                <div class="mo-arena-hud">
+                    <div class="mo-hud-pill">
+                        <span id="hud-flag" class="mo-flag">🏳️</span>
+                        <div class="mo-nation-info">
+                            <strong id="hud-country-name">NATION</strong>
+                            <small id="hud-event-name">EVENT 1 / 5</small>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 24px; align-items: center;">
+                        <div class="mo-hud-stat">
+                            <small id="hud-stat-1-label">SHOTS</small>
+                            <strong id="hud-stat-1-val">0 / 5</strong>
+                        </div>
+                        <div class="mo-hud-stat">
+                            <small id="hud-stat-2-label">POINTS</small>
+                            <strong id="hud-stat-2-val">0</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="game-canvas-container" class="mo-game-canvas-container">
+                    <canvas id="mo-canvas" class="mo-game-canvas" width="800" height="460"></canvas>
+                    <div id="canvas-overlay" class="mo-canvas-overlay" aria-live="polite"></div>
+                </div>
+
+                <div id="arena-controls" class="mo-arena-controls">
+                    <!-- Event-specific button controls (for touch & mouse) -->
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 5A: EVENT SCOREBOARD (FIRST) -->
+        <section id="screen-event-scoreboard" class="mo-screen">
+            <div class="mo-panel">
+                <div class="mo-header">
+                    <div>
+                        <span id="esb-kicker" class="mo-kicker">EVENT COMPLETED</span>
+                        <h2 id="esb-title" class="mo-title">EVENT <span>SCOREBOARD</span></h2>
+                        <p id="esb-desc" class="mo-desc">Official event rankings and medals awarded across all 16 competing nations.</p>
+                    </div>
+                </div>
+
+                <!-- Player's Performance Highlight -->
+                <div class="mo-player-result-card" style="margin-bottom: 24px;">
+                    <div id="res-medal-badge" class="mo-medal-badge mo-medal-gold">🥇</div>
+                    <div id="res-rank-text" class="mo-result-rank">1ST PLACE</div>
+                    <div id="res-country-display" style="font-size: 18px; font-weight: 700;">
+                        <span id="res-flag">🏳️</span> <span id="res-country-name">Your Nation</span>
+                    </div>
+                    <div id="res-score-text" class="mo-result-score">Performance: -</div>
+                    <p id="res-feedback-text" style="font-size: 13px; color: #9bb3cc; margin-top: 4px;"></p>
+                </div>
+
+                <!-- 16-Nation Event Scoreboard Table -->
+                <div class="mo-standings-container" style="margin-bottom: 28px;">
+                    <div class="mo-standings-title">
+                        <span id="event-scoreboard-title">🎯 EVENT SCOREBOARD (ALL 16 NATIONS)</span>
+                        <small id="event-metric-header" style="color: var(--cyan); text-transform: uppercase;">PERFORMANCE</small>
+                    </div>
+                    <div id="mo-event-scoreboard-legend" style="display: none;"></div>
+                    <table class="mo-table" aria-label="Event scoreboard">
+                        <thead id="event-scoreboard-thead">
+                            <tr id="event-scoreboard-head-row">
+                                <th class="col-rank">#</th>
+                                <th>NATION</th>
+                                <th id="th-performance" style="text-align: right; padding-right: 18px;">POINTS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="event-scoreboard-body">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="text-align: center; margin-top: 24px;">
+                    <button id="btn-to-cumulative-standings" class="mo-btn mo-btn-gold mo-action-large" type="button">
+                        NEXT: VIEW MEDAL TALLY <span>➔</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 5B: MEDAL TALLY (SECOND) -->
+        <section id="screen-cumulative-standings" class="mo-screen">
+            <div class="mo-panel">
+                <div class="mo-header">
+                    <div>
+                        <span id="cum-kicker" class="mo-kicker">OLYMPIC MEDAL TABLE</span>
+                        <h2 id="cum-title" class="mo-title">MEDAL <span>TALLY</span></h2>
+                        <p id="cum-desc" class="mo-desc">Cumulative medal tally and nation rankings up to this point in the competition.</p>
+                    </div>
+                </div>
+
+                <!-- Player's Overall Standing Highlight -->
+                <div class="mo-landing-info" id="player-standing-summary" style="margin-bottom: 24px;">
+                    <span class="info-icon">🎖️</span>
+                    <p id="player-standing-text">
+                        <strong>Current Standing:</strong> Up-to-date medal tally across all completed events.
+                    </p>
+                </div>
+
+                <!-- 16-Nation Cumulative Medal Tally Table -->
+                <div class="mo-standings-container" style="margin-bottom: 28px;">
+                    <div class="mo-standings-title">
+                        <span id="cumulative-standings-title">🏅 MEDAL TALLY (TILL THIS POINT)</span>
+                        <small style="color: var(--gold);">OLYMPIC TALLY</small>
+                    </div>
+                    <table class="mo-table" aria-label="Medal standings">
+                        <thead>
+                            <tr>
+                                <th class="col-rank">#</th>
+                                <th>NATION</th>
+                                <th class="col-medals badge-gold">🥇 G</th>
+                                <th class="col-medals badge-silver">🥈 S</th>
+                                <th class="col-medals badge-bronze">🥉 B</th>
+                                <th class="col-medals">TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody id="event-standings-body">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="text-align: center; margin-top: 24px; display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;">
+                    <button id="btn-back-to-scoreboard" class="mo-btn mo-btn-secondary" type="button">
+                        ← BACK TO SCOREBOARD
+                    </button>
+                    <button id="btn-next-event-action" class="mo-btn mo-btn-gold mo-action-large" type="button">
+                        CONTINUE TO NEXT EVENT <span>➔</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN 6: FINAL CEREMONY -->
+        <section id="screen-final-ceremony" class="mo-screen">
+            <div class="mo-panel mo-ceremony">
+                <span class="mo-kicker">CLOSING CEREMONY / MEDAL PRESENTATION</span>
+                <h2 class="mo-title">CHAMPIONSHIP <span>MEDAL CEREMONY</span></h2>
+                <p class="mo-desc" style="margin: 6px auto 20px;">
+                    All five events have concluded. Exactly 15 Olympic medals have been awarded across 16 competing nations.
+                </p>
+
+                <!-- 3D-styled Olympic Podium -->
+                <div class="mo-podium-container" aria-label="Championship podium">
+                    <div class="mo-podium-step mo-step-silver">
+                        <div class="mo-podium-avatar">
+                            <span id="podium-silver-flag" class="mo-podium-flag">🥈</span>
+                            <span id="podium-silver-name" class="mo-podium-name">Silver Nation</span>
+                            <span id="podium-silver-medals" class="mo-podium-medals">0 Medals</span>
+                        </div>
+                        <div class="mo-podium-pillar">2</div>
+                    </div>
+
+                    <div class="mo-podium-step mo-step-gold">
+                        <div class="mo-podium-avatar">
+                            <span id="podium-gold-flag" class="mo-podium-flag">🥇</span>
+                            <span id="podium-gold-name" class="mo-podium-name">Gold Nation</span>
+                            <span id="podium-gold-medals" class="mo-podium-medals">0 Medals</span>
+                        </div>
+                        <div class="mo-podium-pillar">1</div>
+                    </div>
+
+                    <div class="mo-podium-step mo-step-bronze">
+                        <div class="mo-podium-avatar">
+                            <span id="podium-bronze-flag" class="mo-podium-flag">🥉</span>
+                            <span id="podium-bronze-name" class="mo-podium-name">Bronze Nation</span>
+                            <span id="podium-bronze-medals" class="mo-podium-medals">0 Medals</span>
+                        </div>
+                        <div class="mo-podium-pillar">3</div>
+                    </div>
+                </div>
+
+                <div id="player-final-summary" class="mo-landing-info" style="max-width: 760px; width: 100%; box-sizing: border-box; margin: 0 auto 28px;">
+                    <!-- Player finish highlight injected here -->
+                </div>
+
+                <div class="mo-standings-container" style="max-width: 800px; margin: 0 auto 30px;">
+                    <div class="mo-standings-title">
+                        <span>FINAL OLYMPIC MEDAL TABLE</span>
+                        <small style="color: var(--gold);">5 EVENTS COMPLETED</small>
+                    </div>
+                    <table class="mo-table" aria-label="Final medal table">
+                        <thead>
+                            <tr>
+                                <th class="col-rank">#</th>
+                                <th>NATION</th>
+                                <th class="col-medals badge-gold">🥇 G</th>
+                                <th class="col-medals badge-silver">🥈 S</th>
+                                <th class="col-medals badge-bronze">🥉 B</th>
+                                <th class="col-medals">TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody id="final-standings-body">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;">
+                    <button id="btn-play-again" class="mo-btn mo-btn-gold mo-action-large" type="button">
+                        PLAY AGAIN (NEW DRAW) <span>🔄</span>
+                    </button>
+                    <a href="./index.html" class="mo-btn mo-btn-secondary" style="padding: 16px 28px;">
+                        BACK TO GAMES
+                    </a>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Shared mini-olympics client logic -->
+    <script src="./js/mini-olympics.js?v=olympics-1"></script>
+</body>
+</html>
+

@@ -12,7 +12,6 @@ const timelineEventSchema = new mongoose.Schema({
             "Science", "Sports", "Technology", "History", "Geography", "Entertainment",
             "Nature", "Space", "Business", "General Knowledge", "Music", "Movies", "World",
             "Architecture", "Exploration", "Politics", "Literature", "Military", "Inventions",
-            "Medicine & Health", "Culture", "Environment"
             "Medicine & Health", "Culture", "Environment", "Transportation", "Religion & Civilization"
         ],
         index: true
