@@ -14,7 +14,7 @@ const connectDatabase = async () => {
     } catch (error) {
         if (error && error.name === "MongoParseError") {
             throw new Error(
-                "MONGODB_URI is invalid. URL-encode special characters in credentials."
+                "MONGODB_URI is invalid. URL-encode special characters in credentials. "
             );
         }
 
