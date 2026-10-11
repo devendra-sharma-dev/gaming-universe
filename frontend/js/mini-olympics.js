@@ -532,8 +532,14 @@ document.addEventListener("DOMContentLoaded", () => {
         };
         window.addEventListener("keydown", activeKeyHandler);
 
+        let lastFrameTime = performance.now();
         const render = () => {
-            time += 0.035;
+            const now = performance.now();
+            const dt = Math.min((now - lastFrameTime) / 1000, 0.1);
+            lastFrameTime = now;
+            const dtScale = dt * 60;
+
+            time += 0.035 * dtScale;
 
             // Oscillating crosshair
             if (isAiming) {
@@ -606,7 +612,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Flying Arrow Animation
             if (arrowFlying) {
-                arrowProgress += 0.08;
+                arrowProgress += 0.08 * dtScale;
                 const startX = 60;
                 const startY = canvas.height * 0.7;
                 const curX = startX + (arrowTargetX - startX) * arrowProgress;
@@ -806,16 +812,22 @@ document.addEventListener("DOMContentLoaded", () => {
         let oppDist1 = 0;
         let oppDist2 = 0;
 
+        let lastFrameTime = performance.now();
         const render = () => {
+            const now = performance.now();
+            const dt = Math.min((now - lastFrameTime) / 1000, 0.1);
+            lastFrameTime = now;
+            const dtScale = dt * 60;
+
             // Update Rhythm
-            rhythmPos += rhythmDir * rhythmSpeed;
+            rhythmPos += rhythmDir * rhythmSpeed * dtScale;
             if (rhythmPos > 1) { rhythmPos = 1; rhythmDir = -1; }
             if (rhythmPos < -1) { rhythmPos = -1; rhythmDir = 1; }
 
             // Update Race Physics
             if (raceState === "RACING") {
-                speed = Math.max(0.2, speed * 0.985); // Natural friction decay
-                distance += speed * 0.55;
+                speed = Math.max(0.2, speed * Math.pow(0.985, dtScale)); // Natural friction decay
+                distance += speed * 0.55 * dtScale;
                 elapsed = (performance.now() - startTime) / 1000 + (falseStart ? 1.5 : 0);
 
                 // Top 2 opponents pace according to their projected finish times:
@@ -1466,10 +1478,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
         serveBall();
 
+        let lastFrameTime = performance.now();
         const render = () => {
+            const now = performance.now();
+            const dt = Math.min((now - lastFrameTime) / 1000, 0.1);
+            lastFrameTime = now;
+            const dtScale = dt * 60;
+
             // Update physics
-            ball.x += ball.vx;
-            ball.z += ball.vz;
+            ball.x += ball.vx * dtScale;
+            ball.z += ball.vz * dtScale;
             ball.y = Math.sin(ball.z * Math.PI * 2) * 0.28; // Bounce arc
 
             // Opponent defensive reaction
@@ -1733,11 +1751,17 @@ document.addEventListener("DOMContentLoaded", () => {
         };
         window.addEventListener("keydown", activeKeyHandler);
 
+        let lastFrameTime = performance.now();
         const render = () => {
+            const now = performance.now();
+            const dt = Math.min((now - lastFrameTime) / 1000, 0.1);
+            lastFrameTime = now;
+            const dtScale = dt * 60;
+
             const att = levels[currentLevelIdx] || levels[levels.length - 1];
 
             if (attemptActive) {
-                needlePos += needleDir * att.speed;
+                needlePos += needleDir * att.speed * dtScale;
                 if (needlePos > 1) { needlePos = 1; needleDir = -1; }
                 if (needlePos < -1) { needlePos = -1; needleDir = 1; }
             }
