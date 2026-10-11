@@ -24,7 +24,8 @@ const games = [
         entryPoint: "/timeline.html"
     },
     { id: "004", slug: "mystery-country", title: "Mystery Country", multiplayer: false, status: "daily", entryPoint: "/mystery-country.html" },
-    { id: "005", slug: "estimate-it", title: "Estimate It", multiplayer: false, status: "daily", entryPoint: "/estimate-it.html" } /* Estimate It */
+    { id: "005", slug: "estimate-it", title: "Estimate It", multiplayer: false, status: "daily", entryPoint: "/estimate-it.html" }, /* Estimate It */
+    { id: "006", slug: "mini-olympics", title: "Mini Olympics", multiplayer: false, status: "active", entryPoint: "/mini-olympics.html" }
 ];
 
 const getGame = (slug) => games.find((game) => game.slug === slug) || null;

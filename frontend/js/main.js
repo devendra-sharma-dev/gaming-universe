@@ -14,6 +14,10 @@ document.addEventListener("DOMContentLoaded", () => {
         window.location.replace("./estimate-it.html");
         return;
     }
+    if (new URLSearchParams(window.location.search).get("game") === "mini-olympics") {
+        window.location.replace("./mini-olympics.html");
+        return;
+    }
     const API_ORIGIN = window.GamingSession.apiOrigin;
     const API = `${API_ORIGIN}/api/v1`;
     const navigation = document.querySelector(".main-navigation");
@@ -47,13 +51,23 @@ document.addEventListener("DOMContentLoaded", () => {
         { id: "002", slug: "word-bomb", title: "Word Bomb", type: "WORD / REALTIME ARENA", status: "LIVE" },
         { id: "003", slug: "timeline", title: "Timeline", type: "KNOWLEDGE / DAILY CHALLENGE", status: "DAILY" },
         { id: "004", slug: "mystery-country", title: "Mystery Country", type: "GEOGRAPHY / DAILY CHALLENGE", status: "DAILY" },
-        { id: "005", slug: "estimate-it", title: "Estimate It", type: "ESTIMATION / DAILY CHALLENGE", status: "DAILY" } /* Estimate It */
+        { id: "005", slug: "estimate-it", title: "Estimate It", type: "ESTIMATION / DAILY CHALLENGE", status: "DAILY" }, /* Estimate It */
+        { id: "006", slug: "mini-olympics", title: "Mini Olympics", type: "SPORTS / 5-EVENT CHAMPIONSHIP", status: "LIVE" }
     ];
+
+    const getGameUrl = (slug) => {
+        if (slug === "word-bomb") return "word-bomb.html";
+        if (slug === "timeline") return "timeline.html";
+        if (slug === "mystery-country") return "mystery-country.html";
+        if (slug === "estimate-it") return "estimate-it.html";
+        if (slug === "mini-olympics") return "mini-olympics.html";
+        return `game.html?game=${slug}`;
+    };
 
     const renderLibrary = () => {
         const stage = document.querySelector(".platform-stage");
         if (!stage) return;
-        stage.innerHTML = `<section class="game-library" aria-labelledby="library-title"><div class="library-heading"><div><span class="game-kicker">GAMING UNIVERSE / LIBRARY</span><h1 id="library-title">CHOOSE YOUR <span>UNIVERSE</span></h1><p>Enter a world, master its rules, and leave your mark.</p></div><span class="library-count">01 / ${String(gameCatalog.length).padStart(2, "0")} ACTIVE</span></div><div class="game-library-grid">${gameCatalog.map((game) => `<article class="game-library-card"><div class="library-card-art"><span class="library-card-index">${game.id}</span><div class="library-orbit"></div><div class="library-card-symbol">${game.slug === "word-bomb" ? "W<span>B</span>" : "X<span>O</span>"}</div></div><div class="library-card-body"><span>${game.type}</span><h2>${game.title}</h2><p>${game.slug === "word-bomb" ? "Keep the sequence alive. Pass the pressure." : "Read the grid. Hold the line. Make your move."}</p><a class="game-action-button" href="./${game.slug === "word-bomb" ? "word-bomb.html" : `game.html?game=${game.slug}`}">PLAY GAME <span>↗</span></a></div><span class="library-card-status">${game.status}</span></article>`).join("")}</div></section>`;
+        stage.innerHTML = `<section class="game-library" aria-labelledby="library-title"><div class="library-heading"><div><span class="game-kicker">GAMING UNIVERSE / LIBRARY</span><h1 id="library-title">CHOOSE YOUR <span>UNIVERSE</span></h1><p>Enter a world, master its rules, and leave your mark.</p></div><span class="library-count">01 / ${String(gameCatalog.length).padStart(2, "0")} ACTIVE</span></div><div class="game-library-grid">${gameCatalog.map((game) => `<article class="game-library-card"><div class="library-card-art"><span class="library-card-index">${game.id}</span><div class="library-orbit"></div><div class="library-card-symbol">${game.slug === "word-bomb" ? "W<span>B</span>" : game.slug === "mini-olympics" ? "🏅" : "X<span>O</span>"}</div></div><div class="library-card-body"><span>${game.type}</span><h2>${game.title}</h2><p>${game.slug === "word-bomb" ? "Keep the sequence alive. Pass the pressure." : game.slug === "mini-olympics" ? "Represent your nation in a 5-event world championship." : "Read the grid. Hold the line. Make your move."}</p><a class="game-action-button" href="./${getGameUrl(game.slug)}">PLAY GAME <span>↗</span></a></div><span class="library-card-status">${game.status}</span></article>`).join("")}</div></section>`;
     };
 
     const setupGameSearch = () => {
@@ -74,7 +88,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const query = input.value.trim().toLowerCase();
             if (!query) { close(); return; }
             const matches = gameCatalog.filter((game) => game.title.toLowerCase().includes(query) || game.slug.includes(query)).slice(0, 5);
-            results.innerHTML = matches.length ? matches.map((game) => `<a href="./${game.slug === "word-bomb" ? "word-bomb.html" : game.slug === "timeline" ? "timeline.html" : `game.html?game=${game.slug}`}" ><span>${game.id}</span><strong>${game.title}</strong><small>${game.status}</small></a>`).join("") : `<p class="search-empty">NO GAME FOUND</p>`;
+            results.innerHTML = matches.length ? matches.map((game) => `<a href="./${getGameUrl(game.slug)}"><span>${game.id}</span><strong>${game.title}</strong><small>${game.status}</small></a>`).join("") : `<p class="search-empty">NO GAME FOUND</p>`;
             results.hidden = false;
         });
         document.addEventListener("click", (event) => { if (!search.contains(event.target)) close(); });
