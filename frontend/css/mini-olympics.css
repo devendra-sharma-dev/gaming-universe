@@ -29,7 +29,7 @@
 .mo-shell {
     max-width: 1180px;
     margin: 0 auto;
-    padding: 130px 20px 60px;
+    padding: 106px 20px 24px;
 }
 
 /* Glass panel */
@@ -39,7 +39,7 @@
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border-radius: 14px;
-    padding: 24px;
+    padding: 18px 22px;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
     position: relative;
     overflow: hidden;
@@ -50,9 +50,9 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 24px;
+    margin-bottom: 14px;
     flex-wrap: wrap;
-    gap: 16px;
+    gap: 12px;
 }
 
 .mo-kicker {
@@ -648,7 +648,7 @@
 .mo-arena {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 10px;
 }
 
 .mo-arena-hud {
@@ -660,7 +660,7 @@
     background: rgba(4, 18, 36, 0.7);
     border: 1px solid rgba(0, 200, 255, 0.15);
     border-radius: 10px;
-    padding: 12px 18px;
+    padding: 8px 14px;
 }
 
 .mo-hud-stat {
@@ -676,7 +676,7 @@
 }
 
 .mo-hud-stat strong {
-    font-size: 20px;
+    font-size: 18px;
     color: #ffffff;
     font-weight: 800;
 }
@@ -687,7 +687,7 @@
     border-radius: 12px;
     position: relative;
     width: 100%;
-    min-height: 420px;
+    min-height: auto;
     overflow: hidden;
     display: flex;
     align-items: center;
@@ -737,15 +737,15 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
     flex-wrap: wrap;
-    padding: 8px 0;
+    padding: 4px 0;
 }
 
 .mo-action-large {
-    min-width: 200px;
-    font-size: 16px;
-    padding: 16px 32px;
+    min-width: 180px;
+    font-size: 15px;
+    padding: 12px 28px;
 }
 
 /* Diamond Controller Pad (PlayStation controller layout for Fencing) */
@@ -753,24 +753,35 @@
     display: grid;
     grid-template-areas:
         ". W ."
-        "A . D"
+        "A C D"
         ". S .";
-    grid-template-columns: 64px 64px 64px;
-    grid-template-rows: 64px 64px 64px;
+    grid-template-columns: 74px 74px 74px;
+    grid-template-rows: 72px 72px 72px;
     gap: 8px;
     justify-content: center;
     align-items: center;
-    margin: 8px auto;
+    margin: 6px auto;
+}
+
+.mo-diamond-center {
+    grid-area: C;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    opacity: 0.6;
+    user-select: none;
+    pointer-events: none;
 }
 
 .mo-diamond-btn {
-    width: 64px;
-    height: 64px;
+    width: 74px;
+    height: 72px;
     border-radius: 50%;
     background: linear-gradient(145deg, #1b263b, #0d1527);
-    border: 2px solid rgba(0, 200, 255, 0.4);
+    border: 2.5px solid rgba(0, 200, 255, 0.45);
     color: #ffffff;
-    font-size: 24px;
+    font-size: 28px;
     font-weight: 900;
     font-family: inherit;
     display: flex;
@@ -786,7 +797,7 @@
 .mo-diamond-btn:hover {
     border-color: #00c8ff;
     box-shadow: 0 0 18px rgba(0, 200, 255, 0.55);
-    transform: scale(1.06);
+    transform: scale(1.05);
 }
 
 .mo-diamond-btn:active,
@@ -819,15 +830,22 @@
 
 @media (max-width: 640px) {
     .mo-diamond-pad {
-        grid-template-columns: 58px 58px 58px;
-        grid-template-rows: 58px 58px 58px;
+        grid-template-columns: 78px 78px 78px;
+        grid-template-rows: 68px 68px 68px;
         gap: 6px;
+        margin: 4px auto 6px;
     }
 
     .mo-diamond-btn {
-        width: 58px;
-        height: 58px;
-        font-size: 22px;
+        width: 78px;
+        height: 68px;
+        border-radius: 18px;
+        font-size: 32px;
+        border-width: 2.5px;
+    }
+
+    .mo-diamond-center {
+        font-size: 24px;
     }
 }
 
@@ -835,8 +853,8 @@
 .mo-results-grid {
     display: grid;
     grid-template-columns: 1fr 1.3fr;
-    gap: 24px;
-    margin: 20px 0;
+    gap: 16px;
+    margin: 12px 0;
 }
 
 @media (max-width: 860px) {
@@ -849,25 +867,25 @@
     background: linear-gradient(135deg, rgba(6, 26, 52, 0.8) 0%, rgba(3, 14, 28, 0.9) 100%);
     border: 1px solid var(--cyan);
     border-radius: 12px;
-    padding: 24px;
+    padding: 16px 20px;
     text-align: center;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
+    gap: 8px;
     box-shadow: 0 8px 30px rgba(0, 150, 255, 0.2);
 }
 
 .mo-medal-badge {
-    width: 72px;
-    height: 72px;
+    width: 58px;
+    height: 58px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 34px;
-    margin-bottom: 4px;
+    font-size: 28px;
+    margin-bottom: 2px;
 }
 
 .mo-medal-gold {
@@ -895,13 +913,13 @@
 }
 
 .mo-result-rank {
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 800;
     color: #ffffff;
 }
 
 .mo-result-score {
-    font-size: 15px;
+    font-size: 14px;
     color: var(--cyan);
     font-weight: 700;
 }
@@ -911,17 +929,17 @@
     background: rgba(4, 16, 32, 0.6);
     border: 1px solid rgba(0, 200, 255, 0.15);
     border-radius: 12px;
-    padding: 18px;
-    max-height: 480px;
+    padding: 12px 14px;
+    max-height: clamp(260px, 38vh, 340px);
     overflow-y: auto;
 }
 
 .mo-standings-title {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 700;
     letter-spacing: 1px;
     text-transform: uppercase;
-    margin-bottom: 14px;
+    margin-bottom: 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -1363,8 +1381,29 @@
         padding: 112px 12px 40px;
     }
 
+    body.mo-in-gameplay .mo-shell {
+        padding: 68px 10px 16px;
+    }
+
     .mo-panel {
         padding: 16px;
+    }
+
+    body.mo-in-gameplay .mo-panel.mo-arena {
+        padding: 8px 10px 10px;
+        gap: 6px;
+    }
+
+    body.mo-in-gameplay .mo-arena-hud {
+        padding: 5px 10px;
+    }
+
+    body.mo-in-gameplay .mo-hud-pill {
+        padding: 4px 8px;
+    }
+
+    body.mo-in-gameplay .mo-hud-stat strong {
+        font-size: 15px;
     }
 
     .mo-title {
@@ -1377,7 +1416,14 @@
     }
 
     .mo-game-canvas-container {
-        min-height: 340px;
+        min-height: auto;
+    }
+
+    .mo-action-large {
+        width: 100%;
+        max-width: 380px;
+        font-size: 16px;
+        padding: 13px 20px;
     }
 
     .mo-podium-container {

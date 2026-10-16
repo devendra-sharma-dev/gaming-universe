@@ -113,17 +113,41 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     // Check account session username if available
-    window.GamingSession?.ready?.then(async () => {
+    const initPlayerSession = async () => {
         try {
-            const resp = await window.GamingSession.fetch(`${API_ORIGIN}/api/v1/auth/me`);
+            if (window.GamingSession?.ready) {
+                await window.GamingSession.ready;
+            }
+            const origin = window.GamingSession?.apiOrigin || API_ORIGIN;
+            const resp = await window.GamingSession.fetch(`${origin}/api/v1/users/me`);
             if (resp.ok) {
                 const json = await resp.json();
-                if (json.data?.user?.username && playerNameEl) {
-                    playerNameEl.textContent = json.data.user.username.toUpperCase();
+                const user = json.data?.user || json.data;
+                const name = user?.username;
+                if (name) {
+                    if (playerNameEl) playerNameEl.textContent = `@${name}`;
+                    const allPlayerEls = document.querySelectorAll(".player-name");
+                    allPlayerEls.forEach((el) => { el.textContent = `@${name}`; });
+                    const statusDot = document.querySelector(".player-status");
+                    if (statusDot) statusDot.classList.add("is-active");
                 }
             }
         } catch (_e) {}
-    });
+    };
+    initPlayerSession();
+
+    const playerMenuBtn = document.getElementById("player-menu-button");
+    if (playerMenuBtn) {
+        playerMenuBtn.addEventListener("click", () => {
+            window.location.href = "./index.html";
+        });
+        playerMenuBtn.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                window.location.href = "./index.html";
+            }
+        });
+    }
 
     // Switch Screen Utility
     const showScreen = (name) => {
@@ -144,6 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 screens[key].classList.toggle("active", key === name);
             }
         });
+        document.body.classList.toggle("mo-in-gameplay", name === "gameplay");
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
@@ -324,10 +349,10 @@ document.addEventListener("DOMContentLoaded", () => {
             title: "ARCHERY",
             focus: "Precision & Target Aiming",
             rules: `
-                <p>• You have <strong>5 precision shots</strong> at the moving target.</p>
+                <p>• You have <strong>25 seconds total</strong> to release all <strong>5 precision shots</strong>.</p>
                 <p>• Aim crosshair oscillates with crosswinds. Release your arrow when aligned with the bullseye.</p>
                 <p>• <strong>Bullseye: 10 pts</strong> | Inner: 8 | Middle: 6 | Outer: 4 | Edge: 2 | Miss: 0</p>
-                <p>• Maximum score is <strong>50 points</strong>. Accuracy determines medal rankings.</p>
+                <p>• Maximum score is <strong>50 points</strong>. Complete all 5 shots before the 25-second round clock expires!</p>
             `,
             controls: [
                 `<span class="mo-control-pill"><kbd>SPACE</kbd> or <kbd>CLICK / TAP</kbd> Release Arrow</span>`
@@ -448,10 +473,22 @@ document.addEventListener("DOMContentLoaded", () => {
         hudCountryName.textContent = competition.playerCountry.name;
         hudEventName.textContent = `EVENT ${competition.currentEventIndex + 1} / 5: ${eventId.toUpperCase()}`;
 
-        // Resize Canvas cleanly
-        const rect = canvas.getBoundingClientRect();
-        canvas.width = Math.min(800, window.innerWidth - 48);
-        canvas.height = 440;
+        // Resize Canvas cleanly based on screen ratio & active event
+        const isMobile = window.innerWidth <= 640;
+        canvas.width = Math.min(800, window.innerWidth - (isMobile ? 20 : 48));
+        if (eventId === "fencing" && isMobile) {
+            canvas.height = 200;
+        } else if (eventId === "archery" && isMobile) {
+            // Utilize mobile screen nicely for archery - prominent target board, zero empty dead space below
+            canvas.height = Math.min(460, Math.max(360, window.innerHeight - 230));
+        } else if (eventId === "sprint" && isMobile) {
+            // Sprint on mobile: 3 running lanes + dedicated reaction bar area below track
+            canvas.height = Math.min(350, Math.max(300, window.innerHeight - 340));
+        } else if (isMobile) {
+            canvas.height = Math.min(320, Math.max(260, window.innerHeight - 340));
+        } else {
+            canvas.height = Math.min(380, Math.max(280, window.innerHeight - 360));
+        }
 
         switch (eventId) {
             case "archery":
@@ -491,16 +528,41 @@ document.addEventListener("DOMContentLoaded", () => {
         let arrowTargetY = 0;
         const hits = [];
 
-        // Target geometry (center of right side)
-        const targetX = canvas.width * 0.72;
-        const targetY = canvas.height * 0.5;
-        const rings = [
-            { r: 18, pts: 10, color: "#ffd700", label: "BULLSEYE" },
-            { r: 40, pts: 8, color: "#ff3d57", label: "INNER RING" },
-            { r: 68, pts: 6, color: "#00c8ff", label: "MIDDLE RING" },
-            { r: 96, pts: 4, color: "#1e293b", label: "OUTER RING" },
-            { r: 122, pts: 2, color: "#ffffff", label: "TARGET EDGE" }
+        // 25-second round timer common for all 5 shots
+        let roundTimeRemaining = 25.0;
+        let isRoundActive = true;
+
+        // Responsive target board geometry scaled to utilize screen nicely
+        // Responsive target board & bow geometry scaled to prevent overlap and utilize screen nicely
+        const isMobile = window.innerWidth <= 640;
+        const bowX = isMobile ? 22 : Math.max(35, Math.min(60, canvas.width * 0.10));
+        const bowR = isMobile ? 32 : 48;
+        const bowFrontEdge = bowX + bowR; // Rightmost reach of bow
+
+        // Target radius constrained so bow and target never overlap, keeping a clear flight channel
+        const availableTargetWidth = canvas.width - bowFrontEdge - (isMobile ? 55 : 110);
+        const maxRadiusW = Math.floor(availableTargetWidth * 0.5);
+        const maxRadiusH = Math.floor((canvas.height * 0.5) - 46);
+        const maxOuterR = Math.min(isMobile ? 108 : 125, Math.max(75, Math.min(maxRadiusW, maxRadiusH)));
+        const targetScale = maxOuterR / 122;
+
+        const baseRings = [
+            { baseR: 18, pts: 10, color: "#ffd700", label: "BULLSEYE" },
+            { baseR: 40, pts: 8, color: "#ff3d57", label: "INNER RING" },
+            { baseR: 68, pts: 6, color: "#00c8ff", label: "MIDDLE RING" },
+            { baseR: 96, pts: 4, color: "#1e293b", label: "OUTER RING" },
+            { baseR: 122, pts: 2, color: "#ffffff", label: "TARGET EDGE" }
         ];
+        const rings = baseRings.map((r) => ({
+            r: Math.round(r.baseR * targetScale),
+            pts: r.pts,
+            color: r.color,
+            label: r.label
+        }));
+
+        const maxOuterRadius = rings[rings.length - 1].r;
+        const targetX = canvas.width - maxOuterRadius - (isMobile ? 12 : 32);
+        const targetY = canvas.height * 0.5;
 
         // Aim crosshair motion
         let time = 0;
@@ -510,7 +572,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // UI button for touch
         const fireBtn = document.createElement("button");
         fireBtn.className = "mo-btn mo-btn-gold mo-action-large";
-        fireBtn.textContent = "RELEASE ARROW 🏹";
+        fireBtn.textContent = "RELEASE ARROW 🏹 (Shot 1/5 • 25s)";
         arenaControls.appendChild(fireBtn);
 
         const shoot = () => {
@@ -541,10 +603,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
             time += 0.035 * dtScale;
 
-            // Oscillating crosshair
+            // 30s Common Round Countdown Timer
+            if (isRoundActive && shotsTaken < maxShots) {
+                roundTimeRemaining = Math.max(0, roundTimeRemaining - dt);
+                if (roundTimeRemaining <= 0) {
+                    roundTimeRemaining = 0;
+                    isRoundActive = false;
+                    isAiming = false;
+                    showToast("TIME'S UP! ARCHERY OVER ⏱️", "#ff3d57");
+                    setTimeout(() => {
+                        finishEvent("archery", { rawScore: totalScore });
+                    }, 1200);
+                }
+            }
+
+            // Update button label with round timer & shot counter
             if (isAiming) {
-                const waveX = Math.sin(time * 2.2) * 75 + Math.cos(time * 1.1) * 35;
-                const waveY = Math.cos(time * 1.8) * 60 + Math.sin(time * 0.9) * 25;
+                fireBtn.textContent = `RELEASE ARROW 🏹 (Shot ${shotsTaken + 1}/${maxShots} • ${Math.max(1, Math.ceil(roundTimeRemaining))}s)`;
+            } else if (arrowFlying) {
+                fireBtn.textContent = "ARROW IN FLIGHT...";
+            } else if (shotsTaken >= maxShots || roundTimeRemaining <= 0) {
+                fireBtn.textContent = "ROUND FINISHED!";
+            } else {
+                fireBtn.textContent = `NEXT ARROW... (${Math.max(1, Math.ceil(roundTimeRemaining))}s)`;
+            }
+
+            // Oscillating crosshair (scaled to target scale)
+            if (isAiming) {
+                const waveX = (Math.sin(time * 2.2) * 75 + Math.cos(time * 1.1) * 35) * targetScale;
+                const waveY = (Math.cos(time * 1.8) * 60 + Math.sin(time * 0.9) * 25) * targetScale;
                 crosshairX = targetX + waveX;
                 crosshairY = targetY + waveY;
             }
@@ -565,12 +652,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Target Stand Legs
             ctx.strokeStyle = "#475569";
-            ctx.lineWidth = 6;
+            ctx.lineWidth = Math.max(3, Math.round(6 * targetScale));
             ctx.beginPath();
             ctx.moveTo(targetX, targetY);
-            ctx.lineTo(targetX - 35, targetY + 160);
+            ctx.lineTo(targetX - 35 * targetScale, targetY + 160 * targetScale);
             ctx.moveTo(targetX, targetY);
-            ctx.lineTo(targetX + 35, targetY + 160);
+            ctx.lineTo(targetX + 35 * targetScale, targetY + 160 * targetScale);
             ctx.stroke();
 
             // Draw Target Rings from outside in
@@ -613,8 +700,8 @@ document.addEventListener("DOMContentLoaded", () => {
             // Flying Arrow Animation
             if (arrowFlying) {
                 arrowProgress += 0.08 * dtScale;
-                const startX = 60;
-                const startY = canvas.height * 0.7;
+                const startX = bowX;
+                const startY = canvas.height * 0.65;
                 const curX = startX + (arrowTargetX - startX) * arrowProgress;
                 const curY = startY + (arrowTargetY - startY) * arrowProgress - Math.sin(arrowProgress * Math.PI) * 40;
 
@@ -652,12 +739,15 @@ document.addEventListener("DOMContentLoaded", () => {
                     hudStat2Val.textContent = `${totalScore} / 50`;
                     showToast(`${label} +${awardedPts}`, color);
 
-                    if (shotsTaken < maxShots) {
+                    if (shotsTaken < maxShots && isRoundActive) {
                         setTimeout(() => {
-                            isAiming = true;
-                        }, 500);
+                            if (isRoundActive && roundTimeRemaining > 0) {
+                                isAiming = true;
+                            }
+                        }, 400);
                     } else {
                         // Finished
+                        isRoundActive = false;
                         setTimeout(() => {
                             finishEvent("archery", { rawScore: totalScore });
                         }, 1200);
@@ -667,12 +757,61 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Draw Bow & Archer silhouette on the left
             ctx.save();
-            ctx.strokeStyle = "rgba(0, 200, 255, 0.6)";
-            ctx.lineWidth = 4;
+            ctx.strokeStyle = "rgba(0, 200, 255, 0.75)";
+            ctx.lineWidth = Math.max(3, Math.round(4 * (bowR / 48)));
             ctx.beginPath();
-            ctx.arc(60, canvas.height * 0.65, 50, -Math.PI * 0.35, Math.PI * 0.35);
+            ctx.arc(bowX, canvas.height * 0.65, bowR, -Math.PI * 0.35, Math.PI * 0.35);
+            ctx.stroke();
+
+            // Bowstring
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+            ctx.lineWidth = 1.5;
+            const topTipY = canvas.height * 0.65 - bowR * Math.sin(Math.PI * 0.35);
+            const topTipX = bowX + bowR * Math.cos(Math.PI * 0.35);
+            const btmTipY = canvas.height * 0.65 + bowR * Math.sin(Math.PI * 0.35);
+            const btmTipX = bowX + bowR * Math.cos(Math.PI * 0.35);
+            ctx.beginPath();
+            ctx.moveTo(topTipX, topTipY);
+            ctx.lineTo(btmTipX, btmTipY);
             ctx.stroke();
             ctx.restore();
+
+            // Draw 30s Common Round Countdown Timer HUD at top of arena
+            if (isRoundActive && shotsTaken < maxShots) {
+                const timeSec = Math.max(0, roundTimeRemaining);
+                const timeDisplay = timeSec.toFixed(1);
+                ctx.save();
+
+                const boxW = Math.min(180, canvas.width - 40);
+                const boxH = 34;
+                const boxX = (canvas.width - boxW) / 2;
+                const boxY = 12;
+
+                ctx.fillStyle = "rgba(4, 18, 36, 0.9)";
+                ctx.strokeStyle = timeSec <= 5.0 ? "#ef4444" : timeSec <= 10.0 ? "#f59e0b" : "rgba(0, 200, 255, 0.4)";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(boxX, boxY, boxW, boxH, 6);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = timeSec <= 5.0 ? "#ef4444" : timeSec <= 10.0 ? "#f59e0b" : "#38bdf8";
+                ctx.font = "bold 13px 'Chakra Petch', sans-serif";
+                ctx.textAlign = "center";
+                ctx.fillText(`⏱️ ROUND TIME: ${timeDisplay}s`, canvas.width / 2, boxY + 22);
+
+                // Progress line (25 seconds total)
+                const barW = boxW - 16;
+                const barH = 3;
+                const barX = boxX + 8;
+                const barY = boxY + 28;
+                ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+                ctx.fillRect(barX, barY, barW, barH);
+                ctx.fillStyle = timeSec <= 5.0 ? "#ef4444" : timeSec <= 10.0 ? "#f59e0b" : "#00e5ff";
+                ctx.fillRect(barX, barY, barW * (timeSec / 25.0), barH);
+
+                ctx.restore();
+            }
 
             // Draw Crosshair Sight
             if (isAiming) {
@@ -680,11 +819,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 ctx.strokeStyle = "var(--cyan)";
                 ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.arc(crosshairX, crosshairY, 18, 0, Math.PI * 2);
-                ctx.moveTo(crosshairX - 26, crosshairY);
-                ctx.lineTo(crosshairX + 26, crosshairY);
-                ctx.moveTo(crosshairX, crosshairY - 26);
-                ctx.lineTo(crosshairX, crosshairY + 26);
+                ctx.arc(crosshairX, crosshairY, 18 * targetScale, 0, Math.PI * 2);
+                ctx.moveTo(crosshairX - 26 * targetScale, crosshairY);
+                ctx.lineTo(crosshairX + 26 * targetScale, crosshairY);
+                ctx.moveTo(crosshairX, crosshairY - 26 * targetScale);
+                ctx.lineTo(crosshairX, crosshairY + 26 * targetScale);
                 ctx.stroke();
 
                 // Glowing center pip
@@ -792,8 +931,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const rating = profile.sprint || 75;
             const delta = (Math.random() + Math.random() + Math.random() - 1.5) * 4.2;
             const simScore = Math.max(45, Math.min(98, Math.round(rating + delta)));
-            const sec = 14.50 - ((simScore - 20) / 80) * 5.0;
-            const finishTime = Number(Math.max(9.50, Math.min(14.50, sec)).toFixed(2));
+            const sec = 14.35 - ((simScore - 20) / 80) * 4.95;
+            const finishTime = Number(Math.max(9.35, Math.min(14.35, sec)).toFixed(2));
             return {
                 code: opp.code,
                 name: opp.name,
@@ -854,32 +993,39 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
 
-            // Draw Track
-            ctx.fillStyle = "#1e130b"; // Track tartan red/orange
+            // Layout calculations: Running Track (top) + Cadence Cockpit Panel (strictly below track)
+            const reactionAreaH = 68;
+            const trackTop = 14;
+            const trackBottom = canvas.height - reactionAreaH - 6;
+            const trackH = trackBottom - trackTop;
+            const laneH = trackH / 3;
+
+            // Draw Track Perimeter / Infield Grass
+            ctx.fillStyle = "#1e130b";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Red Tartan Lanes
+            // Red Tartan Running Lanes
             ctx.fillStyle = "#a83232";
-            ctx.fillRect(0, 60, canvas.width, 240);
+            ctx.fillRect(0, trackTop, canvas.width, trackH);
 
-            // Lane Dividers
+            // White Lane Dividers
             ctx.strokeStyle = "#ffffff";
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 2.5;
             for (let i = 0; i <= 3; i++) {
                 ctx.beginPath();
-                ctx.moveTo(0, 60 + i * 80);
-                ctx.lineTo(canvas.width, 60 + i * 80);
+                ctx.moveTo(0, trackTop + i * laneH);
+                ctx.lineTo(canvas.width, trackTop + i * laneH);
                 ctx.stroke();
             }
 
             // Track Distance markers passing by
             const trackOffset = (distance * 25) % 100;
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+            ctx.lineWidth = 1.5;
             for (let x = -trackOffset; x < canvas.width; x += 100) {
                 ctx.beginPath();
-                ctx.moveTo(x, 60);
-                ctx.lineTo(x, 300);
+                ctx.moveTo(x, trackTop);
+                ctx.lineTo(x, trackBottom);
                 ctx.stroke();
             }
 
@@ -890,39 +1036,40 @@ document.addEventListener("DOMContentLoaded", () => {
                     ctx.save();
                     // Glow backdrop
                     ctx.strokeStyle = "rgba(0, 230, 118, 0.4)";
-                    ctx.lineWidth = 12;
+                    ctx.lineWidth = 10;
                     ctx.beginPath();
-                    ctx.moveTo(finishX, 60);
-                    ctx.lineTo(finishX, 300);
+                    ctx.moveTo(finishX, trackTop);
+                    ctx.lineTo(finishX, trackBottom);
                     ctx.stroke();
 
                     // Solid Green Finish Line
                     ctx.strokeStyle = "#00e676";
-                    ctx.lineWidth = 5;
+                    ctx.lineWidth = 4;
                     ctx.beginPath();
-                    ctx.moveTo(finishX, 60);
-                    ctx.lineTo(finishX, 300);
+                    ctx.moveTo(finishX, trackTop);
+                    ctx.lineTo(finishX, trackBottom);
                     ctx.stroke();
 
                     // White Checkered Hash Marks
                     ctx.strokeStyle = "#ffffff";
-                    ctx.lineWidth = 5;
-                    ctx.setLineDash([8, 8]);
+                    ctx.lineWidth = 4;
+                    ctx.setLineDash([6, 6]);
                     ctx.beginPath();
-                    ctx.moveTo(finishX, 60);
-                    ctx.lineTo(finishX, 300);
+                    ctx.moveTo(finishX, trackTop);
+                    ctx.lineTo(finishX, trackBottom);
                     ctx.stroke();
 
                     // "FINISH" Marker Flag
                     ctx.fillStyle = "#00e676";
                     ctx.font = "bold 11px sans-serif";
                     ctx.textAlign = "center";
-                    ctx.fillText("FINISH 🏁", finishX, 52);
+                    ctx.fillText("FINISH 🏁", finishX, Math.max(12, trackTop - 3));
                     ctx.restore();
                 }
             }
 
             // Draw Runners (Lane 1: Opponent 1, Lane 2: Player, Lane 3: Opponent 2)
+            const rScale = Math.min(1.0, Math.max(0.72, laneH / 80));
             const drawRunner = (x, y, jerseyColor, isPlayer = false, flag = "", countryName = "") => {
                 ctx.save();
 
@@ -930,7 +1077,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const skinColor = isPlayer ? "#fed7aa" : "#e2e8f0";
                 ctx.fillStyle = skinColor;
                 ctx.beginPath();
-                ctx.arc(x, y - 20, 10, 0, Math.PI * 2);
+                ctx.arc(x, y - (20 * rScale), 9 * rScale, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.strokeStyle = "#0f172a";
                 ctx.lineWidth = 1.5;
@@ -938,62 +1085,62 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 // Headband
                 ctx.fillStyle = isPlayer ? "#00c8ff" : "#f59e0b";
-                ctx.fillRect(x - 9, y - 26, 18, 4);
+                ctx.fillRect(x - 8 * rScale, y - 26 * rScale, 16 * rScale, 4 * rScale);
 
                 // 2. Torso / Athletic Singlet
                 ctx.fillStyle = jerseyColor;
                 ctx.beginPath();
-                ctx.roundRect(x - 8, y - 9, 16, 22, 3);
+                ctx.roundRect(x - 8 * rScale, y - 9 * rScale, 16 * rScale, 20 * rScale, 3);
                 ctx.fill();
                 ctx.strokeStyle = "#ffffff";
                 ctx.lineWidth = 1;
                 ctx.stroke();
 
                 // 3. Cadence-animated Pumping Arms
-                const armSwing = Math.sin(performance.now() * 0.02 * (speed + 0.6)) * 14;
+                const armSwing = Math.sin(performance.now() * 0.02 * (speed + 0.6)) * (13 * rScale);
                 ctx.strokeStyle = skinColor;
-                ctx.lineWidth = 3.5;
+                ctx.lineWidth = 3 * rScale;
                 ctx.lineCap = "round";
                 // Left arm
                 ctx.beginPath();
-                ctx.moveTo(x - 6, y - 4);
-                ctx.lineTo(x + armSwing, y + 5);
+                ctx.moveTo(x - 6 * rScale, y - 4 * rScale);
+                ctx.lineTo(x + armSwing, y + 4 * rScale);
                 ctx.stroke();
                 // Right arm
                 ctx.beginPath();
-                ctx.moveTo(x + 6, y - 4);
-                ctx.lineTo(x - armSwing, y + 5);
+                ctx.moveTo(x + 6 * rScale, y - 4 * rScale);
+                ctx.lineTo(x - armSwing, y + 4 * rScale);
                 ctx.stroke();
 
                 // 4. Running Shorts & Legs
-                const legSwing = Math.sin(performance.now() * 0.02 * (speed + 0.6)) * 16;
+                const legSwing = Math.sin(performance.now() * 0.02 * (speed + 0.6)) * (15 * rScale);
                 ctx.fillStyle = isPlayer ? "#0284c7" : "#334155";
-                ctx.fillRect(x - 7, y + 13, 14, 8);
+                ctx.fillRect(x - 6 * rScale, y + 11 * rScale, 12 * rScale, 7 * rScale);
 
                 ctx.strokeStyle = skinColor;
-                ctx.lineWidth = 4;
+                ctx.lineWidth = 3.5 * rScale;
                 // Front leg
                 ctx.beginPath();
-                ctx.moveTo(x - 3, y + 20);
-                ctx.lineTo(x + legSwing, y + 33);
+                ctx.moveTo(x - 3 * rScale, y + 18 * rScale);
+                ctx.lineTo(x + legSwing, y + 30 * rScale);
                 ctx.stroke();
                 // Back leg
                 ctx.beginPath();
-                ctx.moveTo(x + 3, y + 20);
-                ctx.lineTo(x - legSwing, y + 33);
+                ctx.moveTo(x + 3 * rScale, y + 18 * rScale);
+                ctx.lineTo(x - legSwing, y + 30 * rScale);
                 ctx.stroke();
 
                 // Sprint Spikes / Shoes
                 ctx.fillStyle = "#ffd700";
-                ctx.fillRect(x + legSwing - 4, y + 32, 8, 3);
-                ctx.fillRect(x - legSwing - 4, y + 32, 8, 3);
+                ctx.fillRect(x + legSwing - 4 * rScale, y + 29 * rScale, 8 * rScale, 3 * rScale);
+                ctx.fillRect(x - legSwing - 4 * rScale, y + 29 * rScale, 8 * rScale, 3 * rScale);
 
                 // Flag & Name Banner above runner
                 ctx.fillStyle = isPlayer ? "#38bdf8" : "#cbd5e1";
-                ctx.font = isPlayer ? "bold 12px sans-serif" : "600 11px sans-serif";
+                ctx.font = isPlayer ? "bold 11px sans-serif" : "600 10px sans-serif";
                 ctx.textAlign = "center";
                 const label = isPlayer ? `${flag} ${countryName} (YOU)` : `${flag} ${countryName}`;
-                ctx.fillText(label, x, y - 36);
+                ctx.fillText(label, x, y - (29 * rScale));
 
                 ctx.restore();
             };
@@ -1003,42 +1150,66 @@ document.addEventListener("DOMContentLoaded", () => {
             const oppX1 = 140 + (oppDist1 - distance) * 7.5;
             const oppX2 = 140 + (oppDist2 - distance) * 7.5;
 
-            drawRunner(oppX1, 100, "#475569", false, topOpp1.flag, topOpp1.name);
-            drawRunner(playerX, 180, "#00c8ff", true, competition.playerCountry.flag, competition.playerCountry.name);
-            drawRunner(oppX2, 260, "#334155", false, topOpp2.flag, topOpp2.name);
+            const lane1Y = Math.round(trackTop + laneH * 0.5);
+            const lane2Y = Math.round(trackTop + laneH * 1.5);
+            const lane3Y = Math.round(trackTop + laneH * 2.5);
 
-            // Draw Rhythm Cadence Bar at the bottom
-            const barW = Math.min(340, canvas.width - 60);
-            const barH = 26;
-            const barX = (canvas.width - barW) / 2;
-            const barY = 360;
+            drawRunner(oppX1, lane1Y, "#475569", false, topOpp1.flag, topOpp1.name);
+            drawRunner(playerX, lane2Y, "#00c8ff", true, competition.playerCountry.flag, competition.playerCountry.name);
+            drawRunner(oppX2, lane3Y, "#334155", false, topOpp2.flag, topOpp2.name);
 
-            // Bar background
-            ctx.fillStyle = "rgba(4, 18, 36, 0.85)";
-            ctx.strokeStyle = "rgba(0, 200, 255, 0.3)";
+            // =========================================================
+            // CADENCE REACTION COCKPIT (Strictly BELOW running track)
+            // =========================================================
+            ctx.save();
+            const panelY = trackBottom + 2;
+            const panelH = canvas.height - panelY;
+
+            // Sleek Dark Cockpit Background
+            ctx.fillStyle = "rgba(4, 14, 28, 0.96)";
+            ctx.fillRect(0, panelY, canvas.width, panelH);
+
+            // Glowing Metallic Separator Curb
+            ctx.strokeStyle = "rgba(0, 200, 255, 0.4)";
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.roundRect(barX, barY, barW, barH, 6);
+            ctx.moveTo(0, panelY);
+            ctx.lineTo(canvas.width, panelY);
+            ctx.stroke();
+
+            // Cadence Reaction Bar
+            const barW = Math.min(340, canvas.width - 40);
+            const barH = 22;
+            const barX = (canvas.width - barW) / 2;
+            const barY = panelY + 10;
+
+            // Bar background
+            ctx.fillStyle = "rgba(2, 8, 18, 0.9)";
+            ctx.strokeStyle = "rgba(0, 200, 255, 0.35)";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(barX, barY, barW, barH, 5);
             ctx.fill();
             ctx.stroke();
 
             // Center Sweet Spot (Green)
             const sweetSpotW = 54;
-            ctx.fillStyle = "rgba(0, 230, 118, 0.4)";
+            ctx.fillStyle = "rgba(0, 230, 118, 0.45)";
             ctx.fillRect(barX + (barW - sweetSpotW) / 2, barY + 2, sweetSpotW, barH - 4);
 
             // Moving Rhythm Indicator (Yellow Pill)
-            const indicatorX = barX + barW / 2 + (rhythmPos * (barW / 2 - 14));
+            const indicatorX = barX + barW / 2 + (rhythmPos * (barW / 2 - 12));
             ctx.fillStyle = "#ffd700";
             ctx.beginPath();
-            ctx.roundRect(indicatorX - 6, barY + 2, 12, barH - 4, 4);
+            ctx.roundRect(indicatorX - 6, barY + 2, 12, barH - 4, 3);
             ctx.fill();
 
             // Label
             ctx.fillStyle = "#94a3b8";
-            ctx.font = "11px sans-serif";
+            ctx.font = "bold 10px sans-serif";
             ctx.textAlign = "center";
-            ctx.fillText("TAP ON GREEN SWEET SPOT FOR CADENCE", canvas.width / 2, barY + 44);
+            ctx.fillText("CADENCE RHYTHM • TAP ON GREEN SWEET SPOT", canvas.width / 2, barY + barH + 14);
+            ctx.restore();
 
             activeGameLoop = requestAnimationFrame(render);
         };
@@ -1770,78 +1941,112 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.fillStyle = "#071326";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Platform Wood Floor
-            const platX = canvas.width * 0.15;
-            const platY = canvas.height * 0.72;
-            const platW = canvas.width * 0.7;
-            const platH = 45;
+            // Responsive Platform & Gauge Meter positioning
+            const isMobile = window.innerWidth <= 640;
+            const meterW = Math.min(360, canvas.width - (isMobile ? 32 : 60));
+            const meterH = isMobile ? 24 : 28;
+            const meterX = (canvas.width - meterW) / 2;
+            const meterY = canvas.height - (isMobile ? 36 : 44);
+
+            // Platform Wood Floor sits above gauge meter with ample buffer
+            const platH = isMobile ? 18 : 24;
+            const platY = meterY - platH - (isMobile ? 10 : 16);
+            const platW = Math.min(canvas.width * 0.78, canvas.width - (isMobile ? 24 : 60));
+            const platX = (canvas.width - platW) / 2;
 
             ctx.fillStyle = "#b45309";
             ctx.fillRect(platX, platY, platW, platH);
             ctx.strokeStyle = "#ffd700";
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 2.5;
             ctx.strokeRect(platX, platY, platW, platH);
 
             // Draw Lifter Athlete
             const lx = canvas.width / 2;
-            const ly = platY - 40;
+            const ly = platY; // Lifter feet planted on platform
+            const scale = isMobile ? 0.78 : 1.0;
 
             ctx.save();
+
+            // Lifter Legs & Shoes on Platform
+            ctx.strokeStyle = "#0284c7";
+            ctx.lineWidth = Math.round(7 * scale);
+            ctx.beginPath();
+            // Left leg
+            ctx.moveTo(lx - 12 * scale, ly - 32 * scale);
+            ctx.lineTo(lx - 16 * scale, ly);
+            // Right leg
+            ctx.moveTo(lx + 12 * scale, ly - 32 * scale);
+            ctx.lineTo(lx + 16 * scale, ly);
+            ctx.stroke();
+
+            // Shoes
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(lx - 22 * scale, ly - 5 * scale, 12 * scale, 5 * scale);
+            ctx.fillRect(lx + 10 * scale, ly - 5 * scale, 12 * scale, 5 * scale);
+
+            // Torso
+            ctx.strokeStyle = "#00c8ff";
+            ctx.lineWidth = Math.round(14 * scale);
+            ctx.beginPath();
+            ctx.moveTo(lx, ly - 70 * scale);
+            ctx.lineTo(lx, ly - 32 * scale);
+            ctx.stroke();
+
             // Lifter Head
             ctx.fillStyle = "#fed7aa";
             ctx.beginPath();
-            ctx.arc(lx, ly - 70, 16, 0, Math.PI * 2);
+            ctx.arc(lx, ly - 86 * scale, 14 * scale, 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = "#1e293b";
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Torso
-            ctx.strokeStyle = "#00c8ff";
-            ctx.lineWidth = 14;
+            // Barbell Height based on state - generous distance above brownish platform
+            // Ready/Chest height: 82*scale above platform, plate radius is 26*scale -> bottom of plates is ~56*scale above platform!
+            let barY = ly - Math.round(82 * scale);
+            if (lifterState === "LIFTING_SUCCESS") barY = ly - Math.round(132 * scale); // Locked Overhead
+            if (lifterState === "LIFTING_FAIL") barY = ly - Math.round(44 * scale); // Dropped above platform
+
+            // Lifter Arms gripping barbell
+            ctx.strokeStyle = "#fed7aa";
+            ctx.lineWidth = Math.round(5 * scale);
             ctx.beginPath();
-            ctx.moveTo(lx, ly - 54);
-            ctx.lineTo(lx, ly - 10);
+            ctx.moveTo(lx - 10 * scale, ly - 62 * scale);
+            ctx.lineTo(lx - 44 * scale, barY);
+            ctx.moveTo(lx + 10 * scale, ly - 62 * scale);
+            ctx.lineTo(lx + 44 * scale, barY);
             ctx.stroke();
 
-            // Barbell Height based on state
-            let barY = ly - 20;
-            if (lifterState === "LIFTING_SUCCESS") barY = ly - 110; // Overhead
-            if (lifterState === "LIFTING_FAIL") barY = ly + 15; // Dropped
-
             // Barbell Shaft
+            const barHalfW = Math.min(canvas.width * 0.38, 120 * scale);
             ctx.strokeStyle = "#e2e8f0";
-            ctx.lineWidth = 6;
+            ctx.lineWidth = Math.max(3, Math.round(5 * scale));
             ctx.beginPath();
-            ctx.moveTo(lx - 120, barY);
-            ctx.lineTo(lx + 120, barY);
+            ctx.moveTo(lx - barHalfW, barY);
+            ctx.lineTo(lx + barHalfW, barY);
             ctx.stroke();
 
             // Weight Plates
-            const plateR = 34;
+            const plateR = Math.round(26 * scale);
+            const plateW = Math.round(14 * scale);
             ctx.fillStyle = att.weight >= 210 ? "#dc2626" : att.weight >= 180 ? "#2563eb" : att.weight >= 160 ? "#d97706" : "#16a34a";
-            ctx.fillRect(lx - 130, barY - plateR, 16, plateR * 2);
-            ctx.fillRect(lx + 114, barY - plateR, 16, plateR * 2);
+            ctx.fillRect(lx - barHalfW - plateW, barY - plateR, plateW, plateR * 2);
+            ctx.fillRect(lx + barHalfW, barY - plateR, plateW, plateR * 2);
 
             // Weight Text Label
             ctx.fillStyle = "#ffffff";
-            ctx.font = "bold 20px sans-serif";
+            ctx.font = isMobile ? "bold 16px sans-serif" : "bold 20px sans-serif";
             ctx.textAlign = "center";
-            ctx.fillText(`${att.weight} KG (LEVEL ${currentLevelIdx + 1}/9)`, lx, 46);
+            ctx.fillText(`${att.weight} KG (LEVEL ${currentLevelIdx + 1}/9)`, lx, isMobile ? 32 : 44);
 
             // Chance Indicator Text
             ctx.fillStyle = currentChance === 1 ? "#00c8ff" : "#fbbf24";
-            ctx.font = "600 13px sans-serif";
-            ctx.fillText(currentChance === 1 ? "CHANCE 1 OF 2" : "CHANCE 2 (FINAL ATTEMPT)", lx, 70);
+            ctx.font = isMobile ? "600 12px sans-serif" : "600 13px sans-serif";
+            ctx.fillText(currentChance === 1 ? "CHANCE 1 OF 2" : "CHANCE 2 (FINAL ATTEMPT)", lx, isMobile ? 52 : 68);
             ctx.restore();
 
             // Draw Gauge Meter at bottom
-            const meterW = Math.min(360, canvas.width - 60);
-            const meterH = 30;
-            const meterX = (canvas.width - meterW) / 2;
-            const meterY = canvas.height - 60;
-
-            ctx.fillStyle = "rgba(4, 18, 36, 0.9)";
+            ctx.fillStyle = "rgba(4, 18, 36, 0.92)";
             ctx.strokeStyle = "rgba(0, 200, 255, 0.3)";
             ctx.lineWidth = 2;
             ctx.beginPath();
@@ -1914,16 +2119,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const btnW = createDiamondBtn("W", "highParry", "mo-btn-w");
         const btnA = createDiamondBtn("A", "dodge", "mo-btn-a");
+        const centerIcon = document.createElement("div");
+        centerIcon.className = "mo-diamond-center";
+        centerIcon.textContent = "🤺";
         const btnD = createDiamondBtn("D", "riposte", "mo-btn-d");
         const btnS = createDiamondBtn("S", "lowParry", "mo-btn-s");
 
         diamondPad.appendChild(btnW);
         diamondPad.appendChild(btnA);
+        diamondPad.appendChild(centerIcon);
         diamondPad.appendChild(btnD);
         diamondPad.appendChild(btnS);
 
         arenaControls.innerHTML = "";
         arenaControls.appendChild(diamondPad);
+
+        // Ensure the entire arena and controls are completely in visible viewport
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        setTimeout(() => {
+            diamondPad.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }, 80);
 
         const flashBtn = (k) => {
             if (btnMap[k]) {
@@ -1985,7 +2200,7 @@ document.addEventListener("DOMContentLoaded", () => {
         };
         window.addEventListener("keydown", activeKeyHandler);
 
-        setTimeout(startBout, 800);
+        setTimeout(startBout, 700);
 
         const render = () => {
             if (boutActive) {
@@ -2004,70 +2219,74 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // Metallic Fencing Piste Strip
-            const stripY = canvas.height * 0.65;
+            const stripY = Math.round(canvas.height * 0.70);
+            const stripH = canvas.height <= 240 ? 18 : 24;
             ctx.fillStyle = "#334155";
-            ctx.fillRect(40, stripY, canvas.width - 80, 24);
+            ctx.fillRect(40, stripY, canvas.width - 80, stripH);
             ctx.strokeStyle = "#00c8ff";
             ctx.lineWidth = 2;
-            ctx.strokeRect(40, stripY, canvas.width - 80, 24);
+            ctx.strokeRect(40, stripY, canvas.width - 80, stripH);
 
             // Center warning lines
             ctx.strokeStyle = "#ffd700";
-            ctx.strokeRect(canvas.width / 2 - 40, stripY, 80, 24);
+            ctx.strokeRect(canvas.width / 2 - 40, stripY, 80, stripH);
 
             // Fencer Silhouettes
             const playerX = canvas.width * 0.32;
             const oppX = canvas.width * 0.68;
-            const fy = stripY - 10;
+            const fy = stripY - 6;
+            const fScale = canvas.height <= 240 ? 0.78 : 1.0;
 
             // Player Fencer (White jacket)
             ctx.fillStyle = "#f8fafc";
             ctx.beginPath();
-            ctx.arc(playerX, fy - 65, 12, 0, Math.PI * 2);
+            ctx.arc(playerX, fy - Math.round(58 * fScale), Math.round(11 * fScale), 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = "#f8fafc";
-            ctx.lineWidth = 6;
+            ctx.lineWidth = Math.round(5 * fScale);
             ctx.beginPath();
-            ctx.moveTo(playerX, fy - 52);
-            ctx.lineTo(playerX + 20, fy - 15);
+            ctx.moveTo(playerX, fy - Math.round(47 * fScale));
+            ctx.lineTo(playerX + Math.round(18 * fScale), fy - Math.round(12 * fScale));
             ctx.stroke();
 
             // Opponent Fencer (Dark grey jacket)
             ctx.fillStyle = "#94a3b8";
             ctx.beginPath();
-            ctx.arc(oppX, fy - 65, 12, 0, Math.PI * 2);
+            ctx.arc(oppX, fy - Math.round(58 * fScale), Math.round(11 * fScale), 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = "#94a3b8";
-            ctx.lineWidth = 6;
+            ctx.lineWidth = Math.round(5 * fScale);
             ctx.beginPath();
-            ctx.moveTo(oppX, fy - 52);
-            ctx.lineTo(oppX - 20, fy - 15);
+            ctx.moveTo(oppX, fy - Math.round(47 * fScale));
+            ctx.lineTo(oppX - Math.round(18 * fScale), fy - Math.round(12 * fScale));
             ctx.stroke();
 
             // Opponent Attack Cue Banner with explicit paired key prompt
             if (boutActive) {
-                const bW = Math.min(320, canvas.width - 40);
-                ctx.fillStyle = "rgba(4, 18, 36, 0.92)";
+                const bW = Math.min(320, canvas.width - 30);
+                const bH = canvas.height <= 240 ? 48 : 58;
+                const bY = canvas.height <= 240 ? 8 : 22;
+                ctx.fillStyle = "rgba(4, 18, 36, 0.94)";
                 ctx.strokeStyle = "#ffd700";
                 ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.roundRect(canvas.width / 2 - bW / 2, 28, bW, 58, 8);
+                ctx.roundRect(canvas.width / 2 - bW / 2, bY, bW, bH, 8);
                 ctx.fill();
                 ctx.stroke();
 
                 ctx.fillStyle = "#ffd700";
-                ctx.font = "bold 18px sans-serif";
+                ctx.font = canvas.height <= 240 ? "bold 15px sans-serif" : "bold 18px sans-serif";
                 ctx.textAlign = "center";
-                ctx.fillText(currentAttack.cue, canvas.width / 2, 52);
+                ctx.fillText(currentAttack.cue, canvas.width / 2, bY + (canvas.height <= 240 ? 20 : 25));
 
                 ctx.fillStyle = "#38bdf8";
-                ctx.font = "bold 12px sans-serif";
-                ctx.fillText(currentAttack.keyPrompt, canvas.width / 2, 72);
+                ctx.font = canvas.height <= 240 ? "bold 11px sans-serif" : "bold 12px sans-serif";
+                ctx.fillText(currentAttack.keyPrompt, canvas.width / 2, bY + (canvas.height <= 240 ? 37 : 44));
 
                 // Reaction Timer Gauge Bar
                 const timerRatio = timerRemaining / timerDuration;
                 ctx.fillStyle = timerRatio > 0.35 ? "#00c8ff" : "#ef4444";
-                ctx.fillRect(canvas.width / 2 - bW / 2 + 2, 88, (bW - 4) * timerRatio, 4);
+                ctx.fillRect(canvas.width / 2 - bW / 2 + 2, bY + bH - 3, (bW - 4) * timerRatio, 3);
             }
 
             activeGameLoop = requestAnimationFrame(render);
@@ -2475,7 +2694,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
                 <div>
                     <span style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; background:rgba(0,200,255,0.12); border:1px solid rgba(0,200,255,0.35); border-radius:6px; font-weight:800; color:var(--gold); font-size:13px;">
-                        ⚡ +${totalXpEarned} XP Earned (30 base + ${goldXp + silverXp + bronzeXp} medals)
+                        ⚡ +${totalXpEarned} XP Earned
                     </span>
                 </div>
             </div>

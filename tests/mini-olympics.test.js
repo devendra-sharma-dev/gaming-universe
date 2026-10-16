@@ -112,8 +112,10 @@ assert.strictEqual(wlZero, 0, "Zero lift should be 0");
 // Fencing: correct decisions & reaction time
 const fencingGood = normalizeScore("fencing", { correctCount: 10, avgReactionMs: 380 });
 const fencingBad = normalizeScore("fencing", { correctCount: 2, avgReactionMs: 1100 });
+const fencing10HitsModerate = normalizeScore("fencing", { correctCount: 10, avgReactionMs: 750 });
 assert(fencingGood > fencingBad, "Good fencing should score higher than poor fencing");
 assert(fencingGood >= 95, "Flawless fencing should be near 100");
+assert(fencing10HitsModerate >= 90, "10/10 hits with realistic reaction time (750ms) must score >= 90");
 console.log("  ✓ Score normalization tests passed.");
 
 // 6. Opponent Score Generation Tests
