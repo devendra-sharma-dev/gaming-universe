@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clever Chaos | Gaming Universe</title>
+    <link rel="stylesheet" href="./css/main.css?v=email-otp-20260915-4">
+    <link rel="stylesheet" href="./css/puzzle-quest.css">
+    <script src="./js/session.js?v=email-otp-20260915-4"></script>
+</head>
+<body class="puzzle-page">
+
+    <!-- GLOBAL NAVIGATION -->
+    <header class="main-navigation">
+        <a class="brand" href="./index.html" aria-label="Gaming Universe Home">
+            <span class="brand-controller" aria-hidden="true">
+                <span class="controller-body">
+                    <span class="controller-stick controller-stick-left"></span>
+                    <span class="controller-stick controller-stick-right"></span>
+                    <span class="controller-dpad"></span>
+                    <span class="controller-buttons">
+                        <span></span><span></span><span></span><span></span>
+                    </span>
+                </span>
+            </span>
+            <span class="brand-name">GAMING <strong>UNIVERSE</strong></span>
+        </a>
+
+        <div class="navigation-search" role="search">
+            <input id="game-search" type="search" placeholder="SEARCH GAMES" autocomplete="off" aria-label="Search games">
+            <div id="game-search-results" class="game-search-results" hidden></div>
+        </div>
+
+        <nav class="navigation-links" aria-label="Main Navigation">
+            <a class="navigation-link" href="./index.html">HOME</a>
+            <a class="navigation-link active" href="./puzzle-quest.html">CLEVER CHAOS</a>
+        </nav>
+
+        <div class="navigation-player" id="player-menu-button" role="button" tabindex="0" aria-label="Open account panel">
+            <span class="player-status" aria-hidden="true"></span>
+            <span class="player-name" id="pq-player-name">GUEST</span>
+        </div>
+    </header>
+
+    <main class="pq-shell">
+
+        <!-- ─────────────────────────────────────────────────────────
+             SCREEN 1: LANDING PAGE
+             ───────────────────────────────────────────────────────── -->
+        <section id="screen-landing" class="pq-screen active">
+            <div class="pq-panel">
+                <!-- HERO BANNER -->
+                <div class="pq-hero-banner">
+                    <img class="pq-hero-img" src="./assets/puzzle-quest-hero.jpg" alt="Clever Chaos Hero Banner" />
+                    <div class="pq-hero-overlay">
+                        <span class="pq-hero-tag">GAME #007 / LOGIC EXPEDITION</span>
+                        <h1 class="pq-hero-title">CLEVER <span>CHAOS</span></h1>
+                        <p class="pq-hero-subtitle">AN EPIC SAGA OF LOGIC, DEDUCTION &amp; SPATIAL MASTERY</p>
+                    </div>
+                </div>
+
+                <!-- Useful Stats & Attributes Strip -->
+                <div class="pq-stats-strip">
+                    <div class="pq-stat-chip"><span>🎮</span> <strong>SOLO</strong> Campaign</div>
+                    <div class="pq-stat-chip"><span>⭐</span> <strong>3-STAR</strong> Mastery System</div>
+                    <div class="pq-stat-chip"><span>🏆</span> <strong>XP</strong> Platform Rewards</div>
+                </div>
+
+                <!-- Primary Action Buttons -->
+                <div class="pq-hero-actions">
+                    <button id="pq-landing-resume-btn" class="pq-btn pq-btn-gold pq-btn-large" type="button">
+                        START / RESUME QUEST ▶
+                    </button>
+                    <button id="pq-landing-map-btn" class="pq-btn pq-btn-cyan pq-btn-large" type="button">
+                        EXPLORE SAGA MAP 🗺️
+                    </button>
+                </div>
+
+                <!-- Journey Highlights / How to Play -->
+                <div class="pq-journey-section">
+                    <div class="pq-section-heading">
+                        <span class="pq-section-tag">EXPEDITION ROADMAP</span>
+                        <h2 class="pq-section-title">THE EXPEDITION PROTOCOL</h2>
+                        <p class="pq-section-desc">Progress through an escalating gauntlet of cognitive trials designed to test your deduction, pattern recognition, and tactical problem-solving.</p>
+                    </div>
+
+                    <div class="pq-journey-grid">
+                        <div class="pq-journey-card">
+                            <div class="pq-journey-icon">🗺️</div>
+                            <div class="pq-journey-step">PHASE 01</div>
+                            <h3>Saga Progression</h3>
+                            <p>Traverse an interconnected saga map where each conquered challenge unlocks new branches, unique puzzle mechanics, and historical relics.</p>
+                        </div>
+                        <div class="pq-journey-card">
+                            <div class="pq-journey-icon">⭐</div>
+                            <div class="pq-journey-step">PHASE 02</div>
+                            <h3>3-Star Mastery</h3>
+                            <p>Refine your speed and move efficiency on every challenge. Earn 3 stars per stage to maximize your platform standing and bonus XP.</p>
+                        </div>
+                        <div class="pq-journey-card">
+                            <div class="pq-journey-icon">💡</div>
+                            <div class="pq-journey-step">PHASE 03</div>
+                            <h3>Tactical Guidance</h3>
+                            <p>Encountering a complex configuration? Activate contextual hints for dynamic visual glows, optimal move cues, and analytical clues.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─────────────────────────────────────────────────────────
+             SCREEN 2: CONNECTED SAGA WAR MAP
+             ───────────────────────────────────────────────────────── -->
+        <section id="screen-map" class="pq-screen">
+            <div class="pq-panel pq-map-panel">
+                <div class="pq-map-header">
+                    <div class="pq-map-title-box">
+                        <h2>THE SAGA <span>PATHWAY</span></h2>
+                    </div>
+
+                    <div class="pq-map-controls">
+                        <span class="pq-map-badge" id="pq-map-stars-count" style="color:var(--gold); border-color:rgba(245, 197, 24, 0.4); background:rgba(245, 197, 24, 0.12);">★ 0 STARS</span>
+                        <span class="pq-map-badge" id="pq-map-progress-count">0 / 50 COMPLETED</span>
+                        <span class="pq-map-badge" id="pq-map-xp-count" style="color:var(--gold); border-color:var(--gold);">0 XP</span>
+                        <button id="pq-map-back-btn" class="pq-hud-btn" type="button">◀ BACK TO MENU</button>
+                    </div>
+                </div>
+
+                <!-- Horizontal Map Stage with SVG Chain Track -->
+                <div class="pq-map-stage" id="pq-map-stage">
+                    <div class="pq-map-canvas" id="pq-map-canvas">
+                        <svg id="pq-map-svg" class="pq-map-svg"></svg>
+                        <div id="pq-map-nodes" class="pq-map-nodes-container"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─────────────────────────────────────────────────────────
+             SCREEN 3: GAMEPLAY ARENA
+             ───────────────────────────────────────────────────────── -->
+        <section id="screen-game" class="pq-screen">
+            <div class="pq-panel">
+                <!-- Game Header HUD -->
+                <div class="pq-game-header">
+                    <div class="pq-game-meta">
+                        <span id="pq-hud-icon" style="font-size: 28px;">🧩</span>
+                        <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start;">
+                            <span id="pq-hud-level-badge" class="pq-level-badge">LEVEL 1</span>
+                            <h2 id="pq-hud-title" class="pq-game-title">Puzzle Title</h2>
+                        </div>
+                    </div>
+
+                    <div class="pq-game-controls">
+                        <!-- Moves -->
+                        <div class="pq-hud-stat" id="pq-hud-moves-stat">
+                            <span class="label">MOVES:</span>
+                            <span id="pq-hud-moves" style="color:var(--cyan);">0</span>
+                        </div>
+                        <!-- Timer -->
+                        <div class="pq-hud-stat">
+                            <span class="label">TIME:</span>
+                            <span id="pq-hud-timer" style="color:var(--gold);">00:00</span>
+                        </div>
+                        <!-- Reference Button -->
+                        <button id="pq-hud-ref-btn" class="pq-hud-btn ref-btn" type="button" style="display:none;">
+                            📜 VIEW ARTIFACT
+                        </button>
+                        <!-- Hint -->
+                        <button id="pq-hud-hint-btn" class="pq-hud-btn" type="button">
+                            💡 HINT
+                        </button>
+                        <!-- Reset -->
+                        <button id="pq-hud-reset-btn" class="pq-hud-btn" type="button">
+                            ↺ RESET
+                        </button>
+                        <!-- Back to Map -->
+                        <button id="pq-game-back-map" class="pq-hud-btn" type="button">
+                            🗺️ MAP
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Instructions Strip -->
+                <div class="pq-instructions-strip" id="pq-instructions-strip">
+                    <span class="icon">ℹ️</span>
+                    <span id="pq-instructions-text">Read instructions carefully to conquer this stage.</span>
+                </div>
+
+                <!-- Active Puzzle Arena -->
+                <div id="pq-board-arena" class="pq-board-arena">
+                    <!-- Dynamic Engine Injected Here -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- SCRIPTS -->
+    <script src="./js/puzzle-quest/config.js"></script>
+    <script src="./js/puzzle-quest/catalog.js"></script>
+    <script src="./js/puzzle-quest/progress.js"></script>
+    <script src="./js/puzzle-quest/engines/mathPattern.js"></script>
+    <script src="./js/puzzle-quest/engines/hanoi.js"></script>
+    <script src="./js/puzzle-quest/engines/matchstick.js"></script>
+    <script src="./js/puzzle-quest/engines/sequenceQuiz.js"></script>
+    <script src="./js/puzzle-quest/engines/maze.js"></script>
+    <script src="./js/puzzle-quest/engines/slidingBlock.js"></script>
+    <script src="./js/puzzle-quest/engines/minesweeper.js"></script>
+    <script src="./js/puzzle-quest/engines/jigsaw.js"></script>
+    <script src="./js/puzzle-quest/engines/nonogram.js"></script>
+    <script src="./js/puzzle-quest/engines/riverCrossing.js"></script>
+    <script src="./js/puzzle-quest/engines/codeBreaker.js"></script>
+    <script src="./js/puzzle-quest/engines/magicSquare.js"></script>
+    <script src="./js/puzzle-quest/engines/waterPouring.js"></script>
+    <script src="./js/puzzle-quest/engines/flowFree.js"></script>
+    <script src="./js/puzzle-quest/engines/referenceEngines.js"></script>
+    <script src="./js/puzzle-quest/engines/advancedEngines.js"></script>
+    <script src="./js/puzzle-quest/shell.js"></script>
+    <script src="./js/puzzle-quest/map.js"></script>
+    <script src="./js/puzzle-quest/main.js"></script>
+
+</body>
+</html>
+

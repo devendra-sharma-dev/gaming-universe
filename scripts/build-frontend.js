@@ -12,6 +12,7 @@ if (url && (url.protocol !== "https:" || url.username || url.password || url.pat
 
 const root = path.resolve(__dirname, "..");
 const output = path.join(root, "dist");
+fs.rmSync(output, { recursive: true, force: true });
 fs.mkdirSync(output, { recursive: true });
 fs.cpSync(path.join(root, "frontend"), output, { recursive: true });
 const sessionPath = path.join(output, "js", "session.js");
