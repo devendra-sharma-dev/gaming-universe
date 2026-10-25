@@ -15,7 +15,7 @@ const validateEmail = (email) => {
 const hashOtp = (otp, challengeId) => crypto.createHmac("sha256", process.env.SESSION_SECRET || "gaming-universe-development")
     .update(`${challengeId}:${otp}`).digest("hex");
 
-const issueOtp = async ({ email, browserTokenHash }) => {
+const issueOtp = async ({ email, browserTokenHash, purpose = "email_signin" }) => {
     email = normalizeEmail(email);
     validateEmail(email);
     const now = new Date();
@@ -24,7 +24,7 @@ const issueOtp = async ({ email, browserTokenHash }) => {
     try {
         // A unique email index makes concurrent sends obey the same cooldown.
         await OtpCode.findOneAndUpdate({ email, lastSentAt: { $lte: new Date(now - OTP_RESEND_COOLDOWN_MS) } }, {
-            $set: { email, challengeId, browserTokenHash, purpose: "email_signin", otpHash: hashOtp(otp, challengeId),
+            $set: { email, challengeId, browserTokenHash, purpose, otpHash: hashOtp(otp, challengeId),
                 expiresAt: new Date(now.getTime() + OTP_EXPIRY_MS), lastSentAt: now, attempts: 0, consumedAt: null }
         }, { upsert: true, new: true, runValidators: true });
     } catch (error) {
@@ -39,14 +39,18 @@ const issueOtp = async ({ email, browserTokenHash }) => {
     }
 };
 
-const verifyOtp = async ({ email, otp, browserTokenHash }) => {
+const verifyOtp = async ({ email, otp, browserTokenHash, purpose = null }) => {
     email = normalizeEmail(email);
     validateEmail(email);
     if (!/^\d{6}$/.test(String(otp || ""))) throw createHttpError(400, "Enter the six-digit code.");
+    const query = {
+        email, browserTokenHash, consumedAt: null,
+        expiresAt: { $gt: new Date() }, attempts: { $lt: OTP_MAX_ATTEMPTS }
+    };
+    if (purpose) query.purpose = purpose;
     // Claim an attempt atomically; parallel requests cannot bypass the limit.
-    const code = await OtpCode.findOneAndUpdate({ email, browserTokenHash, consumedAt: null,
-        expiresAt: { $gt: new Date() }, attempts: { $lt: OTP_MAX_ATTEMPTS } },
-    { $inc: { attempts: 1 } }, { new: true }).select("+otpHash");
+    const code = await OtpCode.findOneAndUpdate(query,
+        { $inc: { attempts: 1 } }, { new: true }).select("+otpHash");
     const invalid = () => createHttpError(400, "Code expired, invalid, or too many attempts. Request a new code.");
     if (!code) throw invalid();
     if (!crypto.timingSafeEqual(Buffer.from(code.otpHash, "hex"), Buffer.from(hashOtp(String(otp), code.challengeId), "hex"))) throw invalid();

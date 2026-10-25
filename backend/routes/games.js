@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const express = require("express");
 
 const TicTacToeMatch = require("../models/TicTacToeMatch");
+const User = require("../models/User");
 const { requireAuth } = require("../middleware/auth");
 const {
     chooseComputerMove,
@@ -58,6 +59,34 @@ router.get("/registry", (_request, response) => {
 });
 
 router.use(requireAuth);
+
+router.post(
+    "/cricket/award-xp",
+    asyncRoute(async (request, response) => {
+        const xpEarned = parseInt(request.body?.xpEarned, 10) || 0;
+        if (xpEarned <= 0) {
+            return response.json({
+                success: true,
+                data: { xpEarned: 0, totalXp: request.user.xp }
+            });
+        }
+
+        const validXp = Math.min(xpEarned, 2000);
+        const user = await User.findByIdAndUpdate(
+            request.user._id,
+            { $inc: { xp: validXp } },
+            { new: true }
+        ).select("xp username");
+
+        response.json({
+            success: true,
+            data: {
+                xpEarned: validXp,
+                totalXp: user ? user.xp : (request.user.xp + validXp)
+            }
+        });
+    })
+);
 
 router.post(
     "/tic-tac-toe/computer/matches",

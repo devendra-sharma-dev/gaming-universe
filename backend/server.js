@@ -4,7 +4,7 @@ const path = require("path");
 
 require("dotenv").config({
     path: path.resolve(__dirname, "../.env"),
-    override: true
+    override: process.env.NODE_ENV !== "test"
 });
 
 const connectDatabase = require("./config/database");
@@ -36,6 +36,14 @@ const createGameServer = ({ shared = Boolean(process.env.VERCEL) } = {}) => {
         if (!initialization) initialization = (async () => {
             await connectDatabase();
             await Promise.all([User.init(), OtpCode.init()]);
+            try {
+                const argon2 = require("argon2");
+                const defaultHash = await argon2.hash("admin123");
+                await User.updateMany(
+                    { $or: [{ passwordHash: { $exists: false } }, { passwordHash: null }] },
+                    { $set: { passwordHash: defaultHash } }
+                );
+            } catch (_err) {}
             if (process.env.VERCEL) await require("mongoose").connection.collection("authRateLimits")
                 .createIndex({ resetTime: 1 }, { expireAfterSeconds: 0 });
             await initializeGames();

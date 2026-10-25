@@ -18,16 +18,34 @@
         if (data?.type === "identity-changed") window.location.reload();
     };
     const initialize = async () => {
-        // Only live tabs share this token. It is never kept in localStorage/cookies.
-        const peer = channel ? await new Promise(resolve => {
+        let stored = null;
+        try {
+            if (typeof localStorage !== "undefined" && localStorage && typeof localStorage.getItem === "function") {
+                stored = localStorage.getItem(storageKey);
+            }
+            if (!stored && typeof sessionStorage !== "undefined" && sessionStorage && typeof sessionStorage.getItem === "function") {
+                stored = sessionStorage.getItem(storageKey);
+            }
+        } catch (_error) { /* Storage may be disabled. */ }
+
+        // Only search peers if no stored token was found
+        const peer = (!stored && channel) ? await new Promise(resolve => {
             const timer = setTimeout(() => { acceptPeer = null; resolve(null); }, 250);
             acceptPeer = value => { clearTimeout(timer); acceptPeer = null; resolve(value); };
             channel.postMessage({ type: "session-request", from: tabId });
         }) : null;
-        let stored;
-        try { stored = sessionStorage.getItem(storageKey); } catch (_error) { /* Storage may be disabled. */ }
+
         token = peer || (/^[a-f0-9]{64}$/.test(stored) ? stored : randomToken());
-        try { sessionStorage.setItem(storageKey, token); } catch (_error) { /* In-memory session still works. */ }
+        try {
+            if (typeof localStorage !== "undefined" && localStorage && typeof localStorage.setItem === "function") {
+                localStorage.setItem(storageKey, token);
+            }
+        } catch (_error) { /* Storage disabled */ }
+        try {
+            if (typeof sessionStorage !== "undefined" && sessionStorage && typeof sessionStorage.setItem === "function") {
+                sessionStorage.setItem(storageKey, token);
+            }
+        } catch (_error) { /* Storage disabled */ }
     };
     // Serialize simultaneous new tabs so they discover the first tab's token.
     let ready;
@@ -58,6 +76,13 @@
             return fetch(url, { ...options, headers, credentials: "include" });
         },
         socketAuth: callback => { ready.then(() => callback({ browserToken: token, connectionToken })); },
-        identityChanged: () => channel?.postMessage({ type: "identity-changed" })
+        identityChanged: () => channel?.postMessage({ type: "identity-changed" }),
+        clearSession: () => {
+            try { if (typeof localStorage !== "undefined" && localStorage) localStorage.removeItem(storageKey); } catch (_e) {}
+            try { if (typeof sessionStorage !== "undefined" && sessionStorage) sessionStorage.removeItem(storageKey); } catch (_e) {}
+            token = randomToken();
+            try { if (typeof localStorage !== "undefined" && localStorage) localStorage.setItem(storageKey, token); } catch (_e) {}
+            try { if (typeof sessionStorage !== "undefined" && sessionStorage) sessionStorage.setItem(storageKey, token); } catch (_e) {}
+        }
     };
 })();

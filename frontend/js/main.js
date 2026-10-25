@@ -22,6 +22,10 @@ document.addEventListener("DOMContentLoaded", () => {
         window.location.replace("./puzzle-quest.html");
         return;
     }
+    if (new URLSearchParams(window.location.search).get("game") === "cricket") {
+        window.location.replace("./cricket.html");
+        return;
+    }
     const API_ORIGIN = window.GamingSession.apiOrigin;
     const API = `${API_ORIGIN}/api/v1`;
     const navigation = document.querySelector(".main-navigation");
@@ -74,7 +78,8 @@ document.addEventListener("DOMContentLoaded", () => {
         { id: "004", slug: "mystery-country", title: "Mystery Country", type: "GEOGRAPHY / DAILY CHALLENGE", status: "DAILY" },
         { id: "005", slug: "estimate-it", title: "Estimate It", type: "ESTIMATION / DAILY CHALLENGE", status: "DAILY" }, /* Estimate It */
         { id: "006", slug: "mini-olympics", title: "Mini Olympics", type: "SPORTS / 5-EVENT CHAMPIONSHIP", status: "LIVE" },
-        { id: "007", slug: "puzzle-quest", title: "Clever Chaos", type: "PUZZLE / 50-STAGE SAGA", status: "LIVE" }
+        { id: "007", slug: "puzzle-quest", title: "Clever Chaos", type: "PUZZLE / 50-STAGE SAGA", status: "LIVE" },
+        { id: "008", slug: "cricket", title: "Cricket Arcade", type: "SPORTS / RUN CHASE", status: "LIVE" }
     ];
 
     const getGameUrl = (slug) => {
@@ -84,13 +89,14 @@ document.addEventListener("DOMContentLoaded", () => {
         if (slug === "estimate-it") return "estimate-it.html";
         if (slug === "mini-olympics") return "mini-olympics.html";
         if (slug === "puzzle-quest") return "puzzle-quest.html";
+        if (slug === "cricket") return "cricket.html";
         return `game.html?game=${slug}`;
     };
 
     const renderLibrary = () => {
         const stage = document.querySelector(".platform-stage");
         if (!stage) return;
-        stage.innerHTML = `<section class="game-library" aria-labelledby="library-title"><div class="library-heading"><div><span class="game-kicker">GAMING UNIVERSE / LIBRARY</span><h1 id="library-title">CHOOSE YOUR <span>UNIVERSE</span></h1><p>Enter a world, master its rules, and leave your mark.</p></div><span class="library-count">01 / ${String(gameCatalog.length).padStart(2, "0")} ACTIVE</span></div><div class="game-library-grid">${gameCatalog.map((game) => `<article class="game-library-card"><div class="library-card-art"><span class="library-card-index">${game.id}</span><div class="library-orbit"></div><div class="library-card-symbol">${game.slug === "word-bomb" ? "W<span>B</span>" : game.slug === "mini-olympics" ? "🏅" : game.slug === "puzzle-quest" ? "🧩" : "X<span>O</span>"}</div></div><div class="library-card-body"><span>${game.type}</span><h2>${game.title}</h2><p>${game.slug === "word-bomb" ? "Keep the sequence alive. Pass the pressure." : game.slug === "mini-olympics" ? "Represent your nation in a 5-event world championship." : game.slug === "puzzle-quest" ? "An epic saga of logic, deduction & spatial mastery." : "Read the grid. Hold the line. Make your move."}</p><a class="game-action-button" href="./${getGameUrl(game.slug)}">PLAY GAME <span>↗</span></a></div><span class="library-card-status">${game.status}</span></article>`).join("")}</div></section>`;
+        stage.innerHTML = `<section class="game-library" aria-labelledby="library-title"><div class="library-heading"><div><span class="game-kicker">GAMING UNIVERSE / LIBRARY</span><h1 id="library-title">CHOOSE YOUR <span>UNIVERSE</span></h1><p>Enter a world, master its rules, and leave your mark.</p></div><span class="library-count">01 / ${String(gameCatalog.length).padStart(2, "0")} ACTIVE</span></div><div class="game-library-grid">${gameCatalog.map((game) => `<article class="game-library-card"><div class="library-card-art"><span class="library-card-index">${game.id}</span><div class="library-orbit"></div><div class="library-card-symbol">${game.slug === "word-bomb" ? "W<span>B</span>" : game.slug === "mini-olympics" ? "🏅" : game.slug === "puzzle-quest" ? "🧩" : game.slug === "cricket" ? "🏏" : "X<span>O</span>"}</div></div><div class="library-card-body"><span>${game.type}</span><h2>${game.title}</h2><p>${game.slug === "word-bomb" ? "Keep the sequence alive. Pass the pressure." : game.slug === "mini-olympics" ? "Represent your nation in a 5-event world championship." : game.slug === "puzzle-quest" ? "An epic saga of logic, deduction & spatial mastery." : game.slug === "cricket" ? "Step onto the pitch. Time your shots and chase arcade glory." : "Read the grid. Hold the line. Make your move."}</p><a class="game-action-button" href="./${getGameUrl(game.slug)}">PLAY GAME <span>↗</span></a></div><span class="library-card-status">${game.status}</span></article>`).join("")}</div></section>`;
     };
 
     const setupGameSearch = () => {
@@ -190,8 +196,6 @@ document.addEventListener("DOMContentLoaded", () => {
     let resendTimer = null;
     let authBusy = false;
 
-    const form = (title, submit, fields) => '<form class="auth-form"><h3>' + title + '</h3>' + fields + '<button class="game-action-button" type="submit">' + submit + '</button></form>';
-
     const renderAuth = () => {
         if (!authView) return;
         clearTimeout(usernameTimer);
@@ -199,18 +203,80 @@ document.addEventListener("DOMContentLoaded", () => {
         usernameRevision += 1;
         availableUsername = null;
         setMessage("");
-        document.querySelector("#auth-navigation").hidden = authStep === "account";
+        const navEl = document.querySelector("#auth-navigation");
+
         if (authStep === "account") {
-            authTitle.textContent = "YOUR UNIVERSE";
-            authView.innerHTML = '<div class="auth-account"><strong></strong><span></span><button class="game-action-button" type="button" data-auth-logout>LOG OUT</button></div>';
-            authView.querySelector("strong").textContent = "@" + currentUser.username;
-            authView.querySelector("span").textContent = currentUser.xp + " XP";
+            authTitle.innerHTML = "PLAYER <span>PROFILE</span>";
+            setMessage("Manage your player profile and security credentials.");
+            authView.innerHTML = `
+                <div class="auth-account">
+                    <div class="auth-account-badge">
+                        <div class="auth-account-info">
+                            <strong class="auth-account-username">@${currentUser?.username || "PLAYER"}</strong>
+                            <span class="auth-account-email">${currentUser?.email || "Authenticated User"}</span>
+                        </div>
+                        <div class="auth-account-xp">${currentUser?.xp || 0} XP</div>
+                    </div>
+                    <div class="auth-account-actions">
+                        <button class="game-action-button auth-update-pw-btn" type="button" data-auth-start-update-pw>UPDATE PASSWORD</button>
+                        <button class="game-secondary-button auth-logout-btn" type="button" data-auth-logout>LOG OUT</button>
+                    </div>
+                </div>
+            `;
+            if (navEl) navEl.hidden = true;
             return;
         }
-        authTitle.textContent = "ENTER THE UNIVERSE";
+
+        if (authStep === "update-password") {
+            authTitle.innerHTML = "SECURITY <span>SETTINGS</span>";
+            setMessage("We sent a 6-digit verification code to " + (currentUser?.email || "your email") + ". Enter the code and your new password.");
+            authView.innerHTML = `
+                <form class="auth-form" data-auth-action="update-password">
+                    <h3>UPDATE YOUR PASSWORD</h3>
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="auth-upd-otp">EMAIL VERIFICATION CODE</label>
+                        <input id="auth-upd-otp" name="otp" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" required>
+                    </div>
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="auth-upd-newpass">NEW PASSWORD</label>
+                        <input id="auth-upd-newpass" name="newPassword" type="password" minlength="6" autocomplete="new-password" placeholder="At least 6 characters" required>
+                    </div>
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="auth-upd-confpass">CONFIRM NEW PASSWORD</label>
+                        <input id="auth-upd-confpass" name="confirmNewPassword" type="password" minlength="6" autocomplete="new-password" placeholder="Repeat new password" required>
+                    </div>
+                    <button class="game-action-button" type="submit">SAVE NEW PASSWORD</button>
+                    <button class="game-secondary-button" type="button" data-auth-switch="account">BACK TO PROFILE</button>
+                </form>
+            `;
+            if (navEl) navEl.hidden = true;
+            authView.querySelector("input")?.focus();
+            return;
+        }
+
         if (authStep === "otp") {
-            authView.innerHTML = form("CHECK YOUR EMAIL", "VERIFY CODE", '<label>EMAIL CODE<input name="otp" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6 digit code" required></label>') + '<button class="game-secondary-button" type="button" data-auth-resend>RESEND CODE</button>';
-            setMessage("We sent a code to " + authContext.email + ". It expires in 5 minutes.");
+            authTitle.innerHTML = "EMAIL <span>VERIFICATION</span>";
+            setMessage("We sent a 6-digit code to " + authContext.email + ". Enter it below to continue creating your account.");
+            authView.innerHTML = `
+                <form class="auth-form" data-auth-action="verify-otp">
+                    <h3>ENTER 6-DIGIT CODE</h3>
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="auth-otp-input">VERIFICATION CODE</label>
+                        <input id="auth-otp-input" name="otp" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6 digit code" required>
+                    </div>
+                    <button class="game-action-button" type="submit">VERIFY CODE</button>
+                    <button class="game-secondary-button" type="button" data-auth-resend>RESEND CODE</button>
+                </form>
+            `;
+            if (navEl) {
+                navEl.hidden = false;
+                navEl.innerHTML = `
+                    <div class="auth-nav-row">
+                        <button type="button" class="auth-nav-link" data-auth-switch="signup">USE ANOTHER EMAIL</button>
+                        <button type="button" class="auth-nav-link secondary" data-auth-switch="login">BACK TO SIGN IN</button>
+                    </div>
+                `;
+            }
             const updateResend = () => {
                 const button = authView.querySelector("[data-auth-resend]");
                 if (!button) return;
@@ -220,13 +286,86 @@ document.addEventListener("DOMContentLoaded", () => {
             };
             updateResend();
             resendTimer = setInterval(updateResend, 1000);
-        } else if (authStep === "username") {
-            authView.innerHTML = form("CHOOSE YOUR USERNAME", "SAVE & PLAY", '<label>USERNAME<input name="username" type="text" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username" aria-describedby="username-status" placeholder="Unique handle" required></label><p id="username-status" class="username-status" aria-live="polite">Use 3–20 letters, numbers, or underscores.</p>');
-            authView.querySelector('[type="submit"]').disabled = true;
-        } else {
-            authStep = "login";
-            authView.innerHTML = form("SIGN IN OR CREATE AN ACCOUNT", "SEND EMAIL CODE", '<label>EMAIL ADDRESS<input name="email" type="email" maxlength="254" autocomplete="email" placeholder="you@example.com" required></label>');
-            setMessage("New here? Verify your email, then choose a username. Returning players keep their account and XP.");
+            authView.querySelector("input")?.focus();
+            return;
+        }
+
+        if (authStep === "username") {
+            authTitle.innerHTML = "SETUP <span>IDENTITY</span>";
+            setMessage("Choose your unique gaming handle and password for returning logins.");
+            authView.innerHTML = `
+                <form class="auth-form" data-auth-action="register">
+                    <h3>CREATE PROFILE & PASSWORD</h3>
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="auth-reg-user">CHOOSE USERNAME</label>
+                        <input id="auth-reg-user" name="username" type="text" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username" aria-describedby="username-status" placeholder="Unique handle" required>
+                        <p id="username-status" class="username-status" aria-live="polite">Use 3–20 letters, numbers, or underscores.</p>
+                    </div>
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="auth-reg-pass">PASSWORD</label>
+                        <input id="auth-reg-pass" name="password" type="password" minlength="6" autocomplete="new-password" placeholder="At least 6 characters" required>
+                    </div>
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="auth-reg-conf">CONFIRM PASSWORD</label>
+                        <input id="auth-reg-conf" name="confirmPassword" type="password" minlength="6" autocomplete="new-password" placeholder="Repeat your password" required>
+                    </div>
+                    <button class="game-action-button" type="submit" disabled>COMPLETE SIGN UP</button>
+                </form>
+            `;
+            if (navEl) navEl.hidden = true;
+            authView.querySelector("input")?.focus();
+            return;
+        }
+
+        if (authStep === "signup") {
+            authTitle.innerHTML = "JOIN THE <span>UNIVERSE</span>";
+            setMessage("Enter your email address to receive a 6-digit verification code to create your account.");
+            authView.innerHTML = `
+                <form class="auth-form" data-auth-action="send-otp">
+                    <h3>CREATE ACCOUNT</h3>
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="auth-signup-email">EMAIL ADDRESS</label>
+                        <input id="auth-signup-email" name="email" type="email" maxlength="254" autocomplete="email" placeholder="you@example.com" required>
+                    </div>
+                    <button class="game-action-button" type="submit">SEND VERIFICATION CODE</button>
+                </form>
+            `;
+            if (navEl) {
+                navEl.hidden = false;
+                navEl.innerHTML = `
+                    <div class="auth-nav-row">
+                        <button type="button" class="auth-nav-link" data-auth-switch="login">ALREADY REGISTERED? SIGN IN</button>
+                    </div>
+                `;
+            }
+            authView.querySelector("input")?.focus();
+            return;
+        }
+
+        // Default: login view (Username & Password only - no email code signin)
+        authStep = "login";
+        authTitle.innerHTML = "ENTER THE <span>UNIVERSE</span>";
+        setMessage("Sign in with your handle and password. Existing accounts can use their username and 'admin123'.");
+        authView.innerHTML = `
+            <form class="auth-form" data-auth-action="login">
+                <div class="auth-field">
+                    <label class="auth-field-label" for="auth-login-identifier">USERNAME OR EMAIL</label>
+                    <input id="auth-login-identifier" name="identifier" type="text" autocomplete="username" placeholder="Enter username or email" required>
+                </div>
+                <div class="auth-field">
+                    <label class="auth-field-label" for="auth-login-password">PASSWORD</label>
+                    <input id="auth-login-password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+                </div>
+                <button class="game-action-button auth-submit-button" type="submit">SIGN IN</button>
+            </form>
+        `;
+        if (navEl) {
+            navEl.hidden = false;
+            navEl.innerHTML = `
+                <div class="auth-nav-row">
+                    <button type="button" class="auth-nav-link" data-auth-switch="signup">NEW HERE? CREATE ACCOUNT</button>
+                </div>
+            `;
         }
         authView.querySelector("input")?.focus();
     };
@@ -250,7 +389,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const sendCode = async (email) => {
         const result = await api("/auth/otp/send", { method: "POST", body: JSON.stringify({ email }) });
-        authContext = { email: result.email, resendAt: Date.now() + result.retryAfter * 1000 };
+        authContext = { email: result.email, resendAt: Date.now() + (result.retryAfter || 60) * 1000 };
         authStep = "otp";
         renderAuth();
     };
@@ -258,16 +397,31 @@ document.addEventListener("DOMContentLoaded", () => {
     const handleAuthSubmit = async (formElement) => {
         if (authBusy) return;
         const data = Object.fromEntries(new FormData(formElement).entries());
-        if (authStep === "username" && availableUsername !== data.username.trim()) return;
+        const action = formElement.dataset.authAction;
+
+        if (action === "register" && availableUsername !== data.username?.trim()) return;
+
         authBusy = true;
         formElement.querySelectorAll("input,button").forEach((el) => { el.disabled = true; });
         try {
             setMessage("Processing...");
-            if (authStep === "login") await sendCode(data.email);
-            else if (authStep === "otp") {
+            if (action === "login") {
+                const identifier = (data.identifier || data.email || "").trim();
+                const password = (data.password || "").trim();
+                if (!password) {
+                    throw new Error("Please enter your password.");
+                }
+                const result = await api("/auth/login", {
+                    method: "POST",
+                    body: JSON.stringify({ identifier, password })
+                });
+                completeLogin(result.user);
+            } else if (action === "send-otp") {
+                await sendCode(data.email.trim());
+            } else if (action === "verify-otp") {
                 const result = await api("/auth/otp/verify", {
                     method: "POST",
-                    body: JSON.stringify({ email: authContext.email, otp: data.otp })
+                    body: JSON.stringify({ email: authContext.email, otp: data.otp.trim() })
                 });
                 if (result.needsUsername) {
                     authStep = "username";
@@ -275,12 +429,33 @@ document.addEventListener("DOMContentLoaded", () => {
                 } else {
                     completeLogin(result.user);
                 }
-            } else if (authStep === "username") {
+            } else if (action === "register") {
+                if (data.password !== data.confirmPassword) {
+                    throw new Error("Passwords do not match.");
+                }
                 const result = await api("/auth/register", {
                     method: "POST",
-                    body: JSON.stringify({ username: data.username.trim() })
+                    body: JSON.stringify({
+                        username: data.username.trim(),
+                        password: data.password.trim()
+                    })
                 });
                 completeLogin(result.user);
+            } else if (action === "update-password") {
+                if (data.newPassword !== data.confirmNewPassword) {
+                    throw new Error("New passwords do not match.");
+                }
+                await api("/auth/password/update", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        otp: data.otp.trim(),
+                        newPassword: data.newPassword.trim()
+                    })
+                });
+                setMessage("Password updated successfully! You can now sign in with your new password.", false);
+                setTimeout(() => {
+                    openAuth("account");
+                }, 1500);
             }
         } catch (error) {
             setMessage(error.message, true);
@@ -288,7 +463,9 @@ document.addEventListener("DOMContentLoaded", () => {
             authBusy = false;
             if (formElement.isConnected) {
                 formElement.querySelectorAll("input,button").forEach((el) => { el.disabled = false; });
-                if (authStep === "username") formElement.querySelector('[type="submit"]').disabled = !availableUsername;
+                if (action === "register") {
+                    formElement.querySelector('[type="submit"]').disabled = !availableUsername;
+                }
             }
         }
     };
@@ -301,7 +478,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const feedback = authView.querySelector("#username-status");
         const submit = authView.querySelector('[type="submit"]');
         availableUsername = null;
-        submit.disabled = true;
+        if (submit) submit.disabled = true;
+        if (!feedback) return;
         feedback.className = "username-status";
         if (!/^[A-Za-z0-9_]{3,20}$/.test(username)) {
             feedback.textContent = "Use 3–20 letters, numbers, or underscores.";
@@ -315,7 +493,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 availableUsername = result.available ? username : null;
                 feedback.textContent = result.available ? "Username available." : "Username already taken. Choose another.";
                 feedback.className = "username-status " + (result.available ? "is-available" : "is-error");
-                submit.disabled = !result.available;
+                if (submit) submit.disabled = !result.available;
             } catch (error) {
                 if (revision !== usernameRevision) return;
                 feedback.textContent = error.message;
@@ -325,15 +503,55 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     authView?.addEventListener("click", async (event) => {
-        if (!event.target.matches("[data-auth-resend]") || authBusy) return;
-        authBusy = true;
-        event.target.disabled = true;
-        try {
-            await sendCode(authContext.email);
-        } catch (error) {
-            setMessage(error.message, true);
-        } finally {
-            authBusy = false;
+        const updateBtn = event.target.closest("[data-auth-start-update-pw]");
+        if (updateBtn && !authBusy) {
+            authBusy = true;
+            setMessage("Sending verification code to your registered email...");
+            try {
+                const res = await api("/auth/password/otp/send", { method: "POST" });
+                authContext = { email: res.email, resendAt: Date.now() + (res.retryAfter || 60) * 1000 };
+                authStep = "update-password";
+                renderAuth();
+            } catch (err) {
+                setMessage(err.message, true);
+            } finally {
+                authBusy = false;
+            }
+            return;
+        }
+
+        if (event.target.matches("[data-auth-resend]") && !authBusy) {
+            authBusy = true;
+            event.target.disabled = true;
+            try {
+                await sendCode(authContext.email);
+            } catch (error) {
+                setMessage(error.message, true);
+            } finally {
+                authBusy = false;
+            }
+            return;
+        }
+
+        if (event.target.matches("[data-auth-logout]")) {
+            try {
+                await api("/auth/logout", { method: "POST" });
+                window.GamingSession.clearSession();
+                socket?.disconnect();
+                updateIdentity(null);
+                closeAuth();
+                window.GamingSession.identityChanged();
+                if (isGamePage) window.location.reload();
+            } catch (error) {
+                setMessage(error.message, true);
+            }
+        }
+    });
+
+    document.addEventListener("click", (event) => {
+        const switchBtn = event.target.closest("[data-auth-switch]");
+        if (switchBtn && !authBusy) {
+            openAuth(switchBtn.dataset.authSwitch);
         }
     });
 
@@ -664,24 +882,7 @@ document.addEventListener("DOMContentLoaded", () => {
         event.preventDefault();
         handleAuthSubmit(event.target);
     });
-    document.querySelector("#auth-navigation")?.addEventListener("click", (event) => {
-        const button = event.target.closest("[data-auth-switch]");
-        if (button && !authBusy) openAuth(button.dataset.authSwitch);
-    });
-    authView?.addEventListener("click", async (event) => {
-        if (event.target.matches("[data-auth-logout]")) {
-            try {
-                await api("/auth/logout", { method: "POST" });
-                socket?.disconnect();
-                updateIdentity(null);
-                closeAuth();
-                window.GamingSession.identityChanged();
-                if (isGamePage) window.location.reload();
-            } catch (error) {
-                setMessage(error.message, true);
-            }
-        }
-    });
+
 
     playerButton?.addEventListener("click", () => currentUser ? openAuth("account") : openAuth("login"));
     playerButton?.addEventListener("keydown", (event) => {
