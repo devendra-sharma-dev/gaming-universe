@@ -115,10 +115,85 @@ const chooseComputerMove = (board, options = {}) => {
     return bestMove;
 };
 
+/**
+ * Intelligent move choice for Infinite Tic-Tac-Toe.
+ * In Infinite Mode, each player has at most 3 markers.
+ * When placing a 4th marker, that player's oldest marker vanishes first.
+ */
+const chooseInfiniteComputerMove = (board, oMoves = [], xMoves = [], options = {}) => {
+    const mistakeChance = Number.isFinite(options.mistakeChance)
+        ? options.mistakeChance
+        : 0.25;
+
+    const oldestO = oMoves.length >= 3 ? oMoves[0] : null;
+    const oldestX = xMoves.length >= 3 ? xMoves[0] : null;
+
+    // Available moves for O: currently empty cells plus O's oldest cell (which will vacate)
+    const availableMoves = [];
+    for (let i = 0; i < 9; i++) {
+        if (!board[i] || i === oldestO) {
+            availableMoves.push(i);
+        }
+    }
+
+    if (!availableMoves.length) return null;
+
+    if (availableMoves.length > 1 && Math.random() < mistakeChance) {
+        return availableMoves[Math.floor(Math.random() * availableMoves.length)];
+    }
+
+    // 1. Can O win on this move?
+    for (const move of availableMoves) {
+        const simBoard = board.slice();
+        if (oldestO !== null) {
+            simBoard[oldestO] = null;
+        }
+        simBoard[move] = "O";
+        const winner = getWinner(simBoard);
+        if (winner && winner.symbol === "O") {
+            return move;
+        }
+    }
+
+    // 2. Can X win on their next move? If so, block them!
+    const xAvailableMoves = [];
+    for (let i = 0; i < 9; i++) {
+        if (!board[i] || i === oldestX) {
+            xAvailableMoves.push(i);
+        }
+    }
+
+    for (const xMove of xAvailableMoves) {
+        const simBoard = board.slice();
+        if (oldestX !== null) {
+            simBoard[oldestX] = null;
+        }
+        simBoard[xMove] = "X";
+        const winner = getWinner(simBoard);
+        if (winner && winner.symbol === "X") {
+            if (availableMoves.includes(xMove)) {
+                return xMove;
+            }
+        }
+    }
+
+    // 3. Take center (cell 4) if open
+    if (availableMoves.includes(4)) return 4;
+
+    // 4. Take corners if available
+    const corners = [0, 2, 6, 8].filter((c) => availableMoves.includes(c));
+    if (corners.length) {
+        return corners[Math.floor(Math.random() * corners.length)];
+    }
+
+    return availableMoves[Math.floor(Math.random() * availableMoves.length)];
+};
+
 module.exports = {
     WIN_LINES,
     getWinner,
     getAvailableMoves,
     getBoardResult,
-    chooseComputerMove
+    chooseComputerMove,
+    chooseInfiniteComputerMove
 };

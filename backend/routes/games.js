@@ -5,6 +5,7 @@ const TicTacToeMatch = require("../models/TicTacToeMatch");
 const { requireAuth } = require("../middleware/auth");
 const {
     chooseComputerMove,
+    chooseInfiniteComputerMove,
     getBoardResult
 } = require("../games/ticTacToe");
 const { awardTicTacToeWinXp, TIC_TAC_TOE_WIN_XP } = require("../services/xp");
@@ -33,6 +34,11 @@ const withMatchLock = (matchId, operation) => {
 const toPublicMatch = (match, totalXp = null) => ({
     matchId: match.matchId,
     mode: match.mode,
+    variant: match.variant || "standard",
+    moveOrder: {
+        X: match.xMoves || [],
+        O: match.oMoves || []
+    },
     board: match.board,
     currentTurn: match.currentTurn,
     status: match.status,
@@ -56,9 +62,14 @@ router.use(requireAuth);
 router.post(
     "/tic-tac-toe/computer/matches",
     asyncRoute(async (request, response) => {
+        const variant = request.body?.variant === "infinite" ? "infinite" : "standard";
+
         const match = await TicTacToeMatch.create({
             matchId: crypto.randomUUID(),
             mode: "computer",
+            variant,
+            xMoves: [],
+            oMoves: [],
             players: [
                 {
                     userId: request.user._id,
@@ -136,6 +147,75 @@ router.post(
                 throw createHttpError(409, "That board cell is already occupied.");
             }
 
+            const isInfinite = match.variant === "infinite";
+
+            if (isInfinite) {
+                if (!Array.isArray(match.xMoves)) match.xMoves = [];
+                if (!Array.isArray(match.oMoves)) match.oMoves = [];
+
+                // When player places 4th marker, oldest vanishes automatically
+                if (match.xMoves.length >= 3) {
+                    const oldestX = match.xMoves.shift();
+                    match.board[oldestX] = null;
+                }
+
+                match.board[cell] = "X";
+                match.xMoves.push(cell);
+                match.markModified("board");
+                match.markModified("xMoves");
+
+                let boardResult = getBoardResult(match.board);
+                let totalXp = null;
+
+                if (boardResult.status === "won") {
+                    match.status = "won";
+                    match.winnerSymbol = boardResult.winner;
+                    match.winningCells = boardResult.winningCells;
+                    match.winnerUserId = request.user._id;
+
+                    await match.save();
+                    totalXp = await awardTicTacToeWinXp({
+                        matchId,
+                        userId: request.user._id
+                    });
+                } else {
+                    match.currentTurn = "O";
+                    const computerCell = chooseInfiniteComputerMove(
+                        match.board,
+                        match.oMoves,
+                        match.xMoves
+                    );
+
+                    if (computerCell !== null) {
+                        if (match.oMoves.length >= 3) {
+                            const oldestO = match.oMoves.shift();
+                            match.board[oldestO] = null;
+                        }
+
+                        match.board[computerCell] = "O";
+                        match.oMoves.push(computerCell);
+                        match.markModified("board");
+                        match.markModified("oMoves");
+
+                        boardResult = getBoardResult(match.board);
+
+                        if (boardResult.status === "won") {
+                            match.status = "won";
+                            match.winnerSymbol = boardResult.winner;
+                            match.winningCells = boardResult.winningCells;
+                            match.winnerUserId = null;
+                        } else {
+                            match.currentTurn = "X";
+                        }
+                    }
+
+                    await match.save();
+                }
+
+                return toPublicMatch(match, totalXp);
+            }
+
+            // Standard Mode logic
             match.board[cell] = "X";
 
             let boardResult = getBoardResult(match.board);

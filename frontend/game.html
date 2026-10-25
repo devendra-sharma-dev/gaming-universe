@@ -4,8 +4,144 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tic Tac Toe — Gaming Universe</title>
-    <link rel="stylesheet" href="./css/main.css?v=email-otp-20260915-4">
-<script src="./js/session.js?v=email-otp-20260915-4"></script></head>
+    <link rel="stylesheet" href="./css/main.css?v=typography-v3">
+    <style>
+        .game-variant-bar {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 12px 20px;
+            margin: 8px 0 14px 0;
+            background: linear-gradient(135deg, rgba(6, 20, 38, 0.88), rgba(2, 9, 18, 0.78));
+            border: 1px solid rgba(0, 200, 255, 0.25);
+            border-radius: 16px;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+        .variant-bar-lead {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            min-width: 150px;
+        }
+        .variant-bar-kicker {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            color: #00c8ff;
+            text-transform: uppercase;
+        }
+        .variant-bar-title {
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            color: #ffffff;
+            text-transform: uppercase;
+        }
+        .variant-toggle-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px;
+            background: rgba(2, 7, 16, 0.78);
+            border: 1px solid rgba(0, 200, 255, 0.2);
+            border-radius: 999px;
+            box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+        }
+        .variant-toggle-btn {
+            appearance: none;
+            -webkit-appearance: none;
+            outline: none;
+            border: 1px solid transparent;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.7);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            padding: 10px 22px;
+            border-radius: 999px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 240ms cubic-bezier(0.16, 1, 0.3, 1);
+            white-space: nowrap;
+        }
+        .variant-toggle-btn:hover {
+            color: #ffffff;
+            background: rgba(0, 200, 255, 0.08);
+            border-color: rgba(0, 200, 255, 0.3);
+        }
+        .variant-toggle-btn.active {
+            color: #ffffff;
+            background: linear-gradient(135deg, rgba(0, 200, 255, 0.32), rgba(0, 130, 230, 0.18));
+            border-color: #00c8ff;
+            box-shadow: 0 0 18px rgba(0, 200, 255, 0.35), inset 0 0 10px rgba(0, 200, 255, 0.2);
+        }
+        .variant-toggle-icon {
+            font-size: 14px;
+            line-height: 1;
+            color: #00c8ff;
+        }
+        .variant-toggle-tag {
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            padding: 3px 7px;
+            border-radius: 4px;
+            background: rgba(255, 209, 92, 0.2);
+            color: #ffd15c;
+            border: 1px solid rgba(255, 209, 92, 0.4);
+        }
+        .variant-bar-rule {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            letter-spacing: 0.06em;
+            color: rgba(255, 255, 255, 0.85);
+        }
+        .variant-bar-rule .rule-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 19px;
+            height: 19px;
+            border-radius: 50%;
+            background: rgba(0, 200, 255, 0.12);
+            border: 1px solid rgba(0, 200, 255, 0.35);
+            color: #00c8ff;
+            font-size: 11px;
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+        @media (max-width: 980px) {
+            .game-variant-bar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+                padding: 14px;
+            }
+            .variant-toggle-pill {
+                width: 100%;
+                justify-content: stretch;
+            }
+            .variant-toggle-btn {
+                flex: 1;
+                justify-content: center;
+            }
+            .variant-bar-rule {
+                justify-content: center;
+            }
+        }
+    </style>
+    <script src="./js/session.js?v=typography-v3"></script>
+</head>
 <body>
 <div id="app">
     <header class="main-navigation">
@@ -19,8 +155,51 @@
     </header>
     <main class="platform-stage">
         <section class="game-portal" aria-labelledby="game-title">
-            <div class="game-portal-header"><div><span class="game-kicker">GAME #001 / LIVE BUILD</span><h1 id="game-title">TIC TAC <span>TOE</span></h1><p class="game-introduction">Read the grid. Hold the line. Make your move.</p><a class="game-home-button" href="./index.html">← BACK TO GAMES</a></div><div class="game-account-summary"><span class="game-account-label">PLAYER XP</span><strong id="game-account-xp">GUEST</strong></div></div>
-            <div class="game-mode-picker" aria-label="Game modes"><button class="game-mode-button active" type="button" data-game-mode="computer"><span class="mode-index">01</span><span><strong>PLAY VS COMPUTER</strong><small>MINIMAX CORE / SOLO MATCH</small></span></button><button class="game-mode-button" type="button" data-game-mode="player"><span class="mode-index">02</span><span><strong>PLAY VS PLAYER</strong><small>LIVE QUEUE / AUTHENTICATED</small></span></button></div>
+            <div class="game-portal-header">
+                <div>
+                    <span class="game-kicker">GAME #001 / LIVE BUILD</span>
+                    <h1 id="game-title">TIC TAC <span>TOE</span></h1>
+                    <p class="game-introduction">Read the grid. Hold the line. Make your move.</p>
+                    <a class="game-home-button" href="./index.html">← BACK TO GAMES</a>
+                </div>
+                <div class="game-account-summary"><span class="game-account-label">PLAYER XP</span><strong id="game-account-xp">GUEST</strong></div>
+            </div>
+
+            <!-- Sleek Game Mode Selection Bar at Top of Game -->
+            <div class="game-variant-bar" role="group" aria-label="Game Mode Selection">
+                <div class="variant-bar-lead">
+                    <span class="variant-bar-kicker">GAME VARIANT</span>
+                    <strong class="variant-bar-title" id="variant-info-title">STANDARD TIC-TAC-TOE</strong>
+                </div>
+
+                <div class="variant-toggle-pill" role="tablist">
+                    <button class="variant-toggle-btn active" type="button" data-game-variant="standard" role="tab" aria-selected="true">
+                        <span class="variant-toggle-icon">&#9632;</span>
+                        <span class="variant-toggle-text">Standard Mode</span>
+                    </button>
+                    <button class="variant-toggle-btn" type="button" data-game-variant="infinite" role="tab" aria-selected="false">
+                        <span class="variant-toggle-icon">&#8734;</span>
+                        <span class="variant-toggle-text">Infinite Mode</span>
+                        <span class="variant-toggle-tag">3 MAX</span>
+                    </button>
+                </div>
+
+                <div class="variant-bar-rule" id="variant-bar-rule">
+                    <span class="rule-icon">&#9432;</span>
+                    <span class="rule-text">Classic 3x3 rules. First to align 3 wins.</span>
+                </div>
+            </div>
+
+            <div class="game-mode-picker" aria-label="Game modes">
+                <button class="game-mode-button active" type="button" data-game-mode="computer">
+                    <span class="mode-index">01</span>
+                    <span><strong>PLAY VS COMPUTER</strong><small>MINIMAX CORE / SOLO MATCH</small></span>
+                </button>
+                <button class="game-mode-button" type="button" data-game-mode="player">
+                    <span class="mode-index">02</span>
+                    <span><strong>PLAY VS PLAYER</strong><small>LIVE QUEUE / AUTHENTICATED</small></span>
+                </button>
+            </div>
             <div class="game-status-bar"><span class="game-status-light" aria-hidden="true"></span><span id="game-status">Choose a mode to enter the arena.</span><button class="game-exit-button" type="button" id="game-exit-button">RESET GAME</button></div>
             <div class="game-arena"><aside class="game-player-rail"><div class="game-player-card active"><span class="player-card-symbol">X</span><span class="player-card-copy"><small>YOU</small><strong id="game-player-name">GUEST</strong></span></div><div class="game-player-card"><span class="player-card-symbol">O</span><span class="player-card-copy"><small>OPPONENT</small><strong id="game-opponent-name">COMPUTER</strong></span></div></aside><div class="board-frame"><div class="tic-tac-toe-board" id="tic-tac-toe-board" role="grid" aria-label="Tic Tac Toe board"><button class="board-cell" type="button" role="gridcell" data-cell="0" aria-label="Cell 1"></button><button class="board-cell" type="button" role="gridcell" data-cell="1" aria-label="Cell 2"></button><button class="board-cell" type="button" role="gridcell" data-cell="2" aria-label="Cell 3"></button><button class="board-cell" type="button" role="gridcell" data-cell="3" aria-label="Cell 4"></button><button class="board-cell" type="button" role="gridcell" data-cell="4" aria-label="Cell 5"></button><button class="board-cell" type="button" role="gridcell" data-cell="5" aria-label="Cell 6"></button><button class="board-cell" type="button" role="gridcell" data-cell="6" aria-label="Cell 7"></button><button class="board-cell" type="button" role="gridcell" data-cell="7" aria-label="Cell 8"></button><button class="board-cell" type="button" role="gridcell" data-cell="8" aria-label="Cell 9"></button></div></div><aside class="game-command-rail"><div class="turn-display"><span class="turn-display-label">CURRENT TURN</span><strong id="game-turn">—</strong></div><div class="game-command-copy" id="game-command-copy">Choose a mode to initialize a match.</div><button class="game-action-button" type="button" id="game-primary-action">START MATCH</button></aside></div>
             <div class="game-start-toast" id="game-start-toast" role="status" aria-live="polite" hidden>MATCH STARTED</div>
@@ -30,6 +209,6 @@
     <div class="auth-overlay" id="auth-overlay" aria-hidden="true" hidden><section class="auth-panel" role="dialog" aria-modal="true" aria-labelledby="auth-title"><button class="auth-close-button" id="auth-close-button" type="button" aria-label="Close account panel">×</button><span class="auth-kicker">GAMING UNIVERSE IDENTITY</span><h2 id="auth-title">ENTER THE <span>UNIVERSE</span></h2><p class="auth-message" id="auth-message" aria-live="polite"></p><div id="auth-view"></div><div class="auth-navigation" id="auth-navigation"><button type="button" data-auth-switch="login">USE ANOTHER EMAIL</button></div></section></div>
 </div>
 
-<script src="./js/main.js?v=email-otp-20260915-4"></script>
+<script src="./js/main.js?v=typography-v3"></script>
 </body>
 </html>

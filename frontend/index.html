@@ -19,10 +19,10 @@
 
     <link
         rel="stylesheet"
-        href="./css/main.css?v=email-otp-20260915-4"
+        href="./css/main.css?v=typography-v3"
     />
 
-<script src="./js/session.js?v=email-otp-20260915-4"></script></head>
+<script src="./js/session.js?v=typography-v3"></script></head>
 
 
 <body>
@@ -172,7 +172,7 @@
                         <p class="game-introduction">
                             Read the grid. Hold the line. Make your move.
                         </p>
-                    </div>
+                        </div>
 
                     <div class="game-account-summary" aria-live="polite">
                         <span class="game-account-label">PLAYER XP</span>
@@ -182,7 +182,33 @@
                 </div>
 
 
-                <div class="game-mode-picker" aria-label="Game modes">
+                
+            <!-- Sleek Game Mode Selection Bar at Top of Game -->
+            <div class="game-variant-bar" role="group" aria-label="Game Mode Selection">
+                <div class="variant-bar-lead">
+                    <span class="variant-bar-kicker">GAME VARIANT</span>
+                    <strong class="variant-bar-title" id="variant-info-title">STANDARD TIC-TAC-TOE</strong>
+                </div>
+
+                <div class="variant-toggle-pill" role="tablist">
+                    <button class="variant-toggle-btn active" type="button" data-game-variant="standard" role="tab" aria-selected="true">
+                        <span class="variant-toggle-icon">&#9632;</span>
+                        <span class="variant-toggle-text">Standard Mode</span>
+                    </button>
+                    <button class="variant-toggle-btn" type="button" data-game-variant="infinite" role="tab" aria-selected="false">
+                        <span class="variant-toggle-icon">&#8734;</span>
+                        <span class="variant-toggle-text">Infinite Mode</span>
+                        <span class="variant-toggle-tag">3 MAX</span>
+                    </button>
+                </div>
+
+                <div class="variant-bar-rule" id="variant-bar-rule">
+                    <span class="rule-icon">&#9432;</span>
+                    <span class="rule-text">Classic 3x3 rules. First to align 3 wins.</span>
+                </div>
+            </div>
+
+            <div class="game-mode-picker" aria-label="Game modes">
 
                     <button
                         class="game-mode-button active"
@@ -372,7 +398,7 @@
          ===================================================== -->
 
 
-    <script src="./js/main.js?v=email-otp-20260915-4"></script>
+    <script src="./js/main.js?v=typography-v3"></script>
 
 </body>
 
