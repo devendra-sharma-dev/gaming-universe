@@ -58,7 +58,7 @@ window.PuzzleEngines.riverCrossing = {
             <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
                 ${isBridge ? `
                     <div style="font-size: 14px; font-weight: 800; color: var(--gold); margin-bottom: 12px; letter-spacing: 0.5px;">
-                        ELAPSED BRIDGE TIME: <span id="pq-torch-time" style="color:var(--cyan); font-size:18px; font-family:monospace;">0</span>
+                        ELAPSED BRIDGE TIME: <span id="pq-torch-time" style="color:var(--cyan); font-size:18px; font-family:monospace;">0</span> MIN
                     </div>
                 ` : ""}
 
@@ -74,7 +74,7 @@ window.PuzzleEngines.riverCrossing = {
                                     🔥 TORCH HERE
                                 </div>
                             ` : ""}
-                            <div id="pq-left-items" style="display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 8px;"></div>
+                            <div id="pq-left-items" class="pq-bank-items"></div>
                         </div>
 
                         <!-- River Water / Bridge Span -->
@@ -94,7 +94,7 @@ window.PuzzleEngines.riverCrossing = {
                                     🔥 TORCH HERE
                                 </div>
                             ` : ""}
-                            <div id="pq-right-items" style="display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 8px;"></div>
+                            <div id="pq-right-items" class="pq-bank-items"></div>
                         </div>
                     </div>
                 </div>
@@ -136,7 +136,7 @@ window.PuzzleEngines.riverCrossing = {
             leftBank.forEach(id => {
                 const ent = entities.find(e => e.id === id);
                 const chip = document.createElement("div");
-                chip.className = "pq-entity-chip";
+                chip.className = "pq-entity-chip in-bank";
                 chip.style.background = ent.bg;
                 chip.innerHTML = `<span>${ent.icon}</span> <span>${ent.name}</span>`;
                 chip.onclick = () => onEntityClick(id, "left");
@@ -147,7 +147,7 @@ window.PuzzleEngines.riverCrossing = {
             rightBank.forEach(id => {
                 const ent = entities.find(e => e.id === id);
                 const chip = document.createElement("div");
-                chip.className = "pq-entity-chip";
+                chip.className = "pq-entity-chip in-bank";
                 chip.style.background = ent.bg;
                 chip.innerHTML = `<span>${ent.icon}</span> <span>${ent.name}</span>`;
                 chip.onclick = () => onEntityClick(id, "right");
@@ -166,7 +166,7 @@ window.PuzzleEngines.riverCrossing = {
             inBoat.forEach(id => {
                 const ent = entities.find(e => e.id === id);
                 const chip = document.createElement("div");
-                chip.className = "pq-entity-chip";
+                chip.className = "pq-entity-chip in-boat";
                 chip.style.background = ent.bg;
                 chip.innerHTML = `<span>${ent.icon}</span>`;
                 chip.title = ent.name;
@@ -174,7 +174,7 @@ window.PuzzleEngines.riverCrossing = {
                 boatPassEl.appendChild(chip);
             });
 
-            if (torchTimeEl) torchTimeEl.innerText = elapsedMinutes;
+            if (torchTimeEl) { torchTimeEl.innerText = elapsedMinutes; torchTimeEl.style.color = (elapsedMinutes > 15) ? "var(--crimson)" : "var(--cyan)"; }
         }
 
         function onEntityClick(id, location) {
@@ -270,17 +270,31 @@ window.PuzzleEngines.riverCrossing = {
             inBoat = [];
             render();
 
-            // Check win condition: all entities on destination bank / far side!
-            if (rightBank.length === entities.length) {
-                if (variant === "bridgeTorch") {
+            // Check win/fail conditions
+            if (variant === "bridgeTorch") {
+                if (rightBank.length === entities.length) {
                     if (elapsedMinutes <= 15) {
                         feedbackEl.innerHTML = `<span style="color:var(--emerald); font-weight: 800;">✓ Optimal Crossing! Everyone made it across the bridge in ${elapsedMinutes} minutes!</span>`;
+                        setTimeout(() => {
+                            shell.completeLevel();
+                        }, 900);
                     } else {
-                        feedbackEl.innerHTML = `<span style="color:var(--gold); font-weight: 800;">All crossed the bridge, but took ${elapsedMinutes} minutes. Can you find a faster crossing?</span>`;
+                        feedbackEl.innerHTML = `<span style="color:var(--crimson); font-weight: 800;">You have exceeded the optimal crossing time!</span>`;
+                        setTimeout(() => {
+                            shell.failLevel("You have exceeded the optimal crossing time! Find a faster strategy to cross the bridge.", "Challenge Failed");
+                        }, 800);
                     }
-                } else {
-                    feedbackEl.innerHTML = `<span style="color:var(--emerald); font-weight: 800;">✓ Journey complete! All passengers transported safely!</span>`;
+                    return;
                 }
+                if (elapsedMinutes > 15) {
+                    feedbackEl.innerHTML = `<span style="color:var(--crimson); font-weight: 800;">You have exceeded the optimal crossing time!</span>`;
+                    setTimeout(() => {
+                        shell.failLevel("You have exceeded the optimal crossing time! Find a faster strategy to cross the bridge.", "Challenge Failed");
+                    }, 800);
+                    return;
+                }
+            } else if (rightBank.length === entities.length) {
+                feedbackEl.innerHTML = `<span style="color:var(--emerald); font-weight: 800;">✓ Journey complete! All passengers transported safely!</span>`;
                 setTimeout(() => {
                     shell.completeLevel();
                 }, 900);

@@ -173,9 +173,12 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     // Show Feedback Toast inside Canvas
-    const showToast = (text, color = "var(--cyan)") => {
+    const showToast = (text, color = "var(--cyan)", singleLine = false) => {
         const toast = document.createElement("div");
         toast.className = "mo-feedback-toast";
+        if (singleLine || text.length <= 26) {
+            toast.classList.add("mo-toast-single-line");
+        }
         toast.style.color = color;
         toast.textContent = text;
         canvasOverlay.innerHTML = "";
@@ -484,6 +487,12 @@ document.addEventListener("DOMContentLoaded", () => {
         } else if (eventId === "sprint" && isMobile) {
             // Sprint on mobile: 3 running lanes + dedicated reaction bar area below track
             canvas.height = Math.min(350, Math.max(300, window.innerHeight - 340));
+        } else if (eventId === "tableTennis" && isMobile) {
+            // TT on mobile: Proportioned table fitting screen comfortably
+            canvas.height = 360;
+        } else if (eventId === "tableTennis") {
+            // TT on desktop: Clean tournament arena height
+            canvas.height = 380;
         } else if (isMobile) {
             canvas.height = Math.min(320, Math.max(260, window.innerHeight - 340));
         } else {
@@ -852,11 +861,17 @@ document.addEventListener("DOMContentLoaded", () => {
         let raceState = "WAIT_READY"; // WAIT_READY -> SET -> GO -> RACING -> FINISHED
         let falseStart = false;
         let distance = 0;
-        let speed = 0;
+        let speed = 0; // Speed in m/s
         let startTime = 0;
         let elapsed = 0;
         let strideCounts = 0;
         let perfectStrides = 0;
+
+        // Anti-mashing / rhythm cadence tracking
+        let lastStrideTime = 0;
+        let stridedInPass = false;
+        let stumbleUntil = 0;
+        let hasStarted = false;
 
         // Rhythm indicator (-1 to 1)
         let rhythmPos = 0;
@@ -882,6 +897,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (raceState === "SET") {
                         raceState = "RACING";
                         startTime = performance.now();
+                        speed = 4.0; // Initial speed out of starting blocks (m/s)
+                        lastStrideTime = performance.now();
+                        stridedInPass = false;
+                        stumbleUntil = 0;
+                        hasStarted = false;
+                        rhythmPos = 0;
+                        rhythmDir = 1;
                         showToast("BANG! GO!! 🔫", "var(--emerald)");
                         strideBtn.disabled = false;
                         strideBtn.textContent = "STRIDE 🏃";
@@ -891,6 +913,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 800);
 
         const handleStride = () => {
+            const now = performance.now();
             if (raceState === "SET" || raceState === "READY") {
                 // False start!
                 falseStart = true;
@@ -899,18 +922,61 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             if (raceState !== "RACING") return;
 
+            // First stride: Reaction drive out of starting blocks!
+            if (!hasStarted) {
+                hasStarted = true;
+                strideCounts = 1;
+                lastStrideTime = now;
+                const reactionMs = now - startTime;
+                if (reactionMs < 90) {
+                    falseStart = true;
+                    showToast("ANTICIPATED GUN! +1.5s PENALTY", "var(--crimson)");
+                    return;
+                }
+                if (reactionMs <= 380) {
+                    perfectStrides++;
+                    speed = Math.min(12.2, speed + 2.8);
+                    showToast(`PERFECT START! 🚀 (${Math.round(reactionMs)}ms)`, "var(--gold)");
+                } else {
+                    speed = Math.min(10.5, speed + 1.4);
+                    showToast("GOOD START! 👍", "var(--cyan)");
+                }
+                return;
+            }
+
             strideCounts++;
+
+            // Anti-mashing / cadence rate limit (160ms limit blocks spam/macros; stridedInPass blocks duplicate hits in one sweep)
+            if (now - lastStrideTime < 160 || stridedInPass) {
+                stumbleUntil = now + 480;
+                speed = Math.max(1.8, speed * 0.4);
+                showToast("MASHING! STUMBLED! ⚠️", "var(--crimson)");
+                lastStrideTime = now;
+                return;
+            }
+
+            lastStrideTime = now;
+            stridedInPass = true;
+
+            // If still recovering from prior stumble:
+            if (now < stumbleUntil) {
+                speed = Math.max(1.8, speed * 0.7);
+                showToast("STUMBLED! RECOVERING ⚠️", "var(--crimson)");
+                return;
+            }
+
+
             const accuracy = 1 - Math.abs(rhythmPos); // 1 = perfect center
 
             if (accuracy >= 0.75) {
                 perfectStrides++;
-                speed = Math.min(1.4, speed + 0.18);
+                speed = Math.min(12.2, speed + 2.3);
                 showToast("PERFECT STRIDE! ⚡", "var(--gold)");
             } else if (accuracy >= 0.45) {
-                speed = Math.min(1.2, speed + 0.1);
-                showToast("GOOD PACE", "var(--cyan)");
+                speed = Math.min(10.5, speed + 1.4);
+                showToast("GOOD PACE 👍", "var(--cyan)");
             } else {
-                speed = Math.max(0.3, speed - 0.12);
+                speed = Math.max(1.8, speed - 2.2);
                 showToast("OFF BEAT ⚠️", "var(--crimson)");
             }
         };
@@ -920,6 +986,7 @@ document.addEventListener("DOMContentLoaded", () => {
         activeKeyHandler = (e) => {
             if (e.code === "Space") {
                 e.preventDefault();
+                if (e.repeat) return;
                 handleStride();
             }
         };
@@ -958,16 +1025,26 @@ document.addEventListener("DOMContentLoaded", () => {
             lastFrameTime = now;
             const dtScale = dt * 60;
 
-            // Update Rhythm
-            rhythmPos += rhythmDir * rhythmSpeed * dtScale;
-            if (rhythmPos > 1) { rhythmPos = 1; rhythmDir = -1; }
-            if (rhythmPos < -1) { rhythmPos = -1; rhythmDir = 1; }
+            // Update Rhythm & reset pass at apex (stationary in blocks until gunshot)
+            if (raceState === "RACING") {
+                rhythmPos += rhythmDir * rhythmSpeed * dtScale;
+                if (rhythmPos > 1) { rhythmPos = 1; rhythmDir = -1; stridedInPass = false; }
+                if (rhythmPos < -1) { rhythmPos = -1; rhythmDir = 1; stridedInPass = false; }
+            } else {
+                rhythmPos = 0;
+            }
 
             // Update Race Physics
             if (raceState === "RACING") {
-                speed = Math.max(0.2, speed * Math.pow(0.985, dtScale)); // Natural friction decay
-                distance += speed * 0.55 * dtScale;
+                const isStumbling = now < stumbleUntil;
+                const dragRate = isStumbling ? 0.985 : 0.996;
+                speed = Math.max(1.5, speed * Math.pow(dragRate, dtScale)); // Natural friction / aerodynamic decay
+                distance += (speed / 60) * dtScale; // Speed in m/s converted to meters per frame (at 60 FPS)
                 elapsed = (performance.now() - startTime) / 1000 + (falseStart ? 1.5 : 0);
+
+                if (strideBtn && !strideBtn.disabled) {
+                    strideBtn.textContent = isStumbling ? "STUMBLED! ⚠️" : "STRIDE 🏃";
+                }
 
                 // Top 2 opponents pace according to their projected finish times:
                 oppDist1 = Math.min(100, (elapsed / topOpp1.finishTime) * 100);
@@ -1097,7 +1174,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 ctx.stroke();
 
                 // 3. Cadence-animated Pumping Arms
-                const armSwing = Math.sin(performance.now() * 0.02 * (speed + 0.6)) * (13 * rScale);
+                const speedVisual = Math.min(1.5, Math.max(0.3, speed / 8));
+                const isStumblingRunner = isPlayer && now < stumbleUntil;
+                const armSwing = Math.sin(performance.now() * 0.018 * (speedVisual + 0.5)) * (13 * rScale);
                 ctx.strokeStyle = skinColor;
                 ctx.lineWidth = 3 * rScale;
                 ctx.lineCap = "round";
@@ -1113,7 +1192,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 ctx.stroke();
 
                 // 4. Running Shorts & Legs
-                const legSwing = Math.sin(performance.now() * 0.02 * (speed + 0.6)) * (15 * rScale);
+                const legSwing = Math.sin(performance.now() * 0.018 * (speedVisual + 0.5)) * (15 * rScale);
                 ctx.fillStyle = isPlayer ? "#0284c7" : "#334155";
                 ctx.fillRect(x - 6 * rScale, y + 11 * rScale, 12 * rScale, 7 * rScale);
 
@@ -1154,8 +1233,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const lane2Y = Math.round(trackTop + laneH * 1.5);
             const lane3Y = Math.round(trackTop + laneH * 2.5);
 
+            const isStumblingPlayer = now < stumbleUntil;
+            const stumbleWobble = isStumblingPlayer ? Math.sin(now * 0.05) * 6 : 0;
             drawRunner(oppX1, lane1Y, "#475569", false, topOpp1.flag, topOpp1.name);
-            drawRunner(playerX, lane2Y, "#00c8ff", true, competition.playerCountry.flag, competition.playerCountry.name);
+            drawRunner(playerX + stumbleWobble, lane2Y, "#00c8ff", true, competition.playerCountry.flag, competition.playerCountry.name);
             drawRunner(oppX2, lane3Y, "#334155", false, topOpp2.flag, topOpp2.name);
 
             // =========================================================
@@ -1348,6 +1429,7 @@ document.addEventListener("DOMContentLoaded", () => {
         let ballState = "TOWARD_PLAYER"; // TOWARD_PLAYER, TOWARD_OPPONENT, BOT_MISSED, POINT_OVER
         let rallySpeedMult = 1.0;
         let pointActive = true;
+        let botPaddleX = 0; // Relative offset from cx (-0.38 to 0.38)
 
         const swingBtn = document.createElement("button");
         swingBtn.className = "mo-btn mo-btn-gold mo-action-large";
@@ -1359,6 +1441,7 @@ document.addEventListener("DOMContentLoaded", () => {
             currentPointRally = 0;
             rallySpeedMult = 1.0;
             lastHitWasPerfect = false;
+            botPaddleX = 0;
             ball = {
                 x: (Math.random() - 0.5) * 0.3,
                 y: 0.1,
@@ -1614,17 +1697,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 totalPlayerReturns++;
                 currentPointRally++;
                 const timingDiff = Math.abs(ball.z - 0.835);
-                let hitQuality = "GOOD RETURN!";
+                let hitQuality = "GOOD RETURN! 🏓";
                 let hitColor = "#00c8ff";
                 lastHitWasPerfect = false;
 
                 if (timingDiff <= 0.05) {
-                    hitQuality = "PERFECT DRIVE! 🔥";
+                    hitQuality = "PERFECT DRIVE! 🔥";
                     hitColor = "#ffd700";
                     lastHitWasPerfect = true;
                 }
 
-                showToast(hitQuality, hitColor);
+                showToast(hitQuality, hitColor, true);
 
                 // Drive ball back across table
                 rallySpeedMult = Math.min(1.85, rallySpeedMult + 0.08);
@@ -1633,7 +1716,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 ball.vz = -cfg.baseSpeed * rallySpeedMult * 1.25;
                 ball.vx = (Math.random() - 0.5) * 0.024;
             } else if (ball.z < 0.72) {
-                showToast("TOO EARLY! ❌", "#ef4444");
+                showToast("TOO EARLY! ❌", "#ef4444", true);
             }
         };
 
@@ -1686,19 +1769,86 @@ document.addEventListener("DOMContentLoaded", () => {
                 handlePointWonByOpponent();
             }
 
-            // Draw Perspective Ping Pong Table
+            // Background
             ctx.fillStyle = "#040d1a";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             const cx = canvas.width / 2;
-            const cy = canvas.height * 0.56;
 
-            // Table trapezoid (3D perspective)
-            const topW = canvas.width * 0.36;
-            const topY = cy - 70;
-            const botW = canvas.width * 0.74;
-            const botY = cy + 120;
+            // Top Broadcast Scoreboard Banner
+            const scoreBarW = Math.min(440, canvas.width - 24);
+            const scoreBarH = 46;
+            const scoreBarY = 8;
+            ctx.fillStyle = "rgba(4, 18, 36, 0.92)";
+            ctx.strokeStyle = "#ffd700";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(cx - scoreBarW / 2, scoreBarY, scoreBarW, scoreBarH, 8);
+            ctx.fill();
+            ctx.stroke();
 
+            // Match header
+            ctx.fillStyle = "#ffd700";
+            ctx.font = "bold 11px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(`${STAGE_CONFIG[currentStage].title} • FIRST TO 3 POINTS`, cx, scoreBarY + 16);
+
+            // Score details
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 15px sans-serif";
+            ctx.fillText(`${competition.playerCountry.flag} ${competition.playerCountry.name}  ${playerScore}  :  ${oppScore}  ${currentOpp.name} ${currentOpp.flag}`, cx, scoreBarY + 36);
+
+            // Perspective depth projection helper (near player side is wider and longer)
+            const proj = (z) => z / (1 + (1 - z) * 0.55);
+
+            // Table geometry (Player's near side is properly longer and wider in 3D perspective)
+            const topY = scoreBarY + scoreBarH + 28;
+            const botY = canvas.height - 30;
+            const tableH = botY - topY;
+
+            const botW = Math.min(520, Math.max(300, canvas.width * (canvas.width <= 640 ? 0.86 : 0.72)));
+            const topW = Math.round(botW * 0.46);
+
+            // Opponent bat tracking (Stays at center ready position when point is won, lost, or not in active rally)
+            let botTarget = 0;
+            if (pointActive && ballState === "TOWARD_OPPONENT") {
+                botTarget = Math.max(-0.35, Math.min(0.35, ball.x));
+            } else {
+                botTarget = 0;
+            }
+            botPaddleX += (botTarget - botPaddleX) * Math.min(1, 0.18 * dtScale);
+            botPaddleX = Math.max(-0.38, Math.min(0.38, botPaddleX));
+
+            // Opponent Silhouette across table
+            const oppX = cx + botPaddleX * (topW * 0.4);
+            const oppY = topY - 12;
+
+            ctx.fillStyle = "#fed7aa";
+            ctx.beginPath();
+            ctx.arc(oppX, oppY - 10, 7, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = "#0284c7";
+            ctx.beginPath();
+            ctx.roundRect(oppX - 9, oppY - 3, 18, 12, 3);
+            ctx.fill();
+
+            ctx.fillStyle = "#94a3b8";
+            ctx.font = "bold 10px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(`${currentOpp.flag} ${currentOpp.name}`, oppX, oppY - 20);
+
+            // Red dot representing opponent TT bat (strictly clamped on table, stays centered on point win/loss)
+            const oppBatX = cx + botPaddleX * (topW * 0.75);
+            ctx.fillStyle = "#ef4444";
+            ctx.beginPath();
+            ctx.arc(oppBatX, topY - 3, 7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Table trapezoid
             ctx.fillStyle = "#0c4a6e"; // Classic Olympic blue table
             ctx.beginPath();
             ctx.moveTo(cx - topW / 2, topY);
@@ -1710,7 +1860,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // White table border
             ctx.strokeStyle = "#ffffff";
-            ctx.lineWidth = 4;
+            ctx.lineWidth = 3.5;
             ctx.stroke();
 
             // Center dividing line
@@ -1720,36 +1870,58 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Net
-            const netY = (topY + botY) / 2;
-            const netW = (topW + botW) / 2 + 30;
-            ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-            ctx.strokeStyle = "#ffffff";
-            ctx.lineWidth = 3;
-            ctx.strokeRect(cx - netW / 2, netY - 26, netW, 26);
-            ctx.fillRect(cx - netW / 2, netY - 26, netW, 26);
+            // Net positioned at genuine 3D perspective midpoint (z = 0.5)
+            // Near player side occupies ~60% of vertical depth, far opponent side occupies ~40%
+            const netZ = proj(0.5);
+            const netY = topY + tableH * netZ;
+            const netW = topW + (botW - topW) * netZ + 18;
+            const netH = 18;
 
-            // Hit Zone indicator near bottom edge (z = 0.835)
-            const hitZoneY = topY + (botY - topY) * 0.835;
-            const hitZoneW = topW + (botW - topW) * 0.835;
-            ctx.save();
-            ctx.strokeStyle = ballState === "TOWARD_PLAYER" && ball.z >= 0.72 && ball.z <= 0.95 ? "#ffd700" : "rgba(0, 200, 255, 0.35)";
-            ctx.lineWidth = 4;
+            ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+            ctx.fillRect(cx - netW / 2, netY, netW, 3);
+
+            ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(cx - netW / 2, netY - netH, netW, netH);
+            ctx.fillRect(cx - netW / 2, netY - netH, netW, netH);
+
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 2.5;
             ctx.beginPath();
-            ctx.ellipse(cx, hitZoneY, hitZoneW * 0.42, 28, 0, 0, Math.PI * 2);
+            ctx.moveTo(cx - netW / 2 - 3, netY - netH);
+            ctx.lineTo(cx + netW / 2 + 3, netY - netH);
+            ctx.stroke();
+
+            // Hit Zone indicator in player court (z = 0.835 in perspective)
+            const hitZoneZ = proj(0.835);
+            const hitZoneY = topY + tableH * hitZoneZ;
+            const hitZoneW = topW + (botW - topW) * hitZoneZ;
+            ctx.save();
+            const isOptimalHitWindow = ballState === "TOWARD_PLAYER" && ball.z >= 0.72 && ball.z <= 0.95;
+            ctx.strokeStyle = isOptimalHitWindow ? "#ffd700" : "rgba(0, 200, 255, 0.4)";
+            ctx.lineWidth = isOptimalHitWindow ? 4 : 2.5;
+            if (isOptimalHitWindow) {
+                ctx.shadowColor = "#ffd700";
+                ctx.shadowBlur = 10;
+            }
+            ctx.beginPath();
+            ctx.ellipse(cx, hitZoneY, hitZoneW * 0.38, 16, 0, 0, Math.PI * 2);
             ctx.stroke();
             ctx.restore();
 
-            // Project ball coordinates to screen
-            const screenBallY = topY + (botY - topY) * ball.z - ball.y * 120;
-            const currentW = topW + (botW - topW) * ball.z;
+            // Project ball coordinates to screen with perspective depth foreshortening
+            const ballProjZ = proj(ball.z);
+            const bounceArc = Math.sin(ball.z * Math.PI) * 38;
+            const screenBallY = topY + tableH * ballProjZ - bounceArc;
+            const currentW = topW + (botW - topW) * ballProjZ;
             const screenBallX = cx + ball.x * (currentW * 0.8);
-            const ballRadius = Math.max(5, 6 + ball.z * 10);
+            const ballRadius = Math.max(5, 5 + ballProjZ * 7);
 
             // Ball shadow on table
-            ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+            ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
             ctx.beginPath();
-            ctx.ellipse(screenBallX, topY + (botY - topY) * ball.z, ballRadius * 1.1, ballRadius * 0.4, 0, 0, Math.PI * 2);
+            ctx.ellipse(screenBallX, topY + tableH * ballProjZ, ballRadius * 1.1, ballRadius * 0.35, 0, 0, Math.PI * 2);
             ctx.fill();
 
             // Ball (Bright orange ping-pong)
@@ -1758,29 +1930,8 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.arc(screenBallX, screenBallY, ballRadius, 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = "#fff3e0";
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 1.5;
             ctx.stroke();
-
-            // Top Broadcast Scoreboard Banner
-            const scoreBarW = Math.min(460, canvas.width - 30);
-            ctx.fillStyle = "rgba(4, 18, 36, 0.92)";
-            ctx.strokeStyle = "#ffd700";
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.roundRect(cx - scoreBarW / 2, 14, scoreBarW, 58, 8);
-            ctx.fill();
-            ctx.stroke();
-
-            // Match header
-            ctx.fillStyle = "#ffd700";
-            ctx.font = "bold 11px sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText(`${STAGE_CONFIG[currentStage].title} • FIRST TO 3 POINTS`, cx, 30);
-
-            // Score details
-            ctx.fillStyle = "#ffffff";
-            ctx.font = "bold 15px sans-serif";
-            ctx.fillText(`${competition.playerCountry.flag} ${competition.playerCountry.name}  ${playerScore}  :  ${oppScore}  ${currentOpp.name} ${currentOpp.flag}`, cx, 54);
 
             activeGameLoop = requestAnimationFrame(render);
         };
@@ -2084,10 +2235,10 @@ document.addEventListener("DOMContentLoaded", () => {
         let timerRemaining = 1200;
 
         const attacks = [
-            { cue: "HIGH THRUST 🤺", keyPrompt: "PRESS [W] ➔ HIGH PARRY", correctAction: "highParry", name: "High Parry", key: "W" },
-            { cue: "LOW LUNGE 🗡️", keyPrompt: "PRESS [S] ➔ LOW PARRY", correctAction: "lowParry", name: "Low Parry", key: "S" },
-            { cue: "SWEEP SLASH ⚔️", keyPrompt: "PRESS [A] ➔ DODGE BACK", correctAction: "dodge", name: "Dodge", key: "A" },
-            { cue: "EXPOSED OPENING 🎯", keyPrompt: "PRESS [D] ➔ RIPOSTE ATTACK", correctAction: "riposte", name: "Riposte", key: "D" }
+            { cue: "HIGH THRUST 🤺", correctAction: "highParry", name: "High Parry", key: "W" },
+            { cue: "LOW LUNGE 🗡️", correctAction: "lowParry", name: "Low Parry", key: "S" },
+            { cue: "SWEEP SLASH ⚔️", correctAction: "dodge", name: "Dodge", key: "A" },
+            { cue: "EXPOSED OPENING 🎯", correctAction: "riposte", name: "Riposte", key: "D" }
         ];
 
         let currentAttack = attacks[0];
@@ -2261,11 +2412,11 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.lineTo(oppX - Math.round(18 * fScale), fy - Math.round(12 * fScale));
             ctx.stroke();
 
-            // Opponent Attack Cue Banner with explicit paired key prompt
+            // Opponent Attack Cue Banner (Emoji and attack name only - no button cheat text)
             if (boutActive) {
                 const bW = Math.min(320, canvas.width - 30);
-                const bH = canvas.height <= 240 ? 48 : 58;
-                const bY = canvas.height <= 240 ? 8 : 22;
+                const bH = canvas.height <= 240 ? 44 : 50;
+                const bY = canvas.height <= 240 ? 10 : 20;
                 ctx.fillStyle = "rgba(4, 18, 36, 0.94)";
                 ctx.strokeStyle = "#ffd700";
                 ctx.lineWidth = 2;
@@ -2275,13 +2426,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 ctx.stroke();
 
                 ctx.fillStyle = "#ffd700";
-                ctx.font = canvas.height <= 240 ? "bold 15px sans-serif" : "bold 18px sans-serif";
+                ctx.font = canvas.height <= 240 ? "bold 16px sans-serif" : "bold 18px sans-serif";
                 ctx.textAlign = "center";
-                ctx.fillText(currentAttack.cue, canvas.width / 2, bY + (canvas.height <= 240 ? 20 : 25));
-
-                ctx.fillStyle = "#38bdf8";
-                ctx.font = canvas.height <= 240 ? "bold 11px sans-serif" : "bold 12px sans-serif";
-                ctx.fillText(currentAttack.keyPrompt, canvas.width / 2, bY + (canvas.height <= 240 ? 37 : 44));
+                ctx.fillText(currentAttack.cue, canvas.width / 2, bY + Math.round(bH / 2) + 6);
 
                 // Reaction Timer Gauge Bar
                 const timerRatio = timerRemaining / timerDuration;
