@@ -19,16 +19,18 @@ const createSessionMiddleware = () => {
         secret: sessionSecret,
         resave: false,
         saveUninitialized: false,
+        rolling: true,
         store: MongoStore.create({
             mongoUrl: process.env.MONGODB_URI,
             collectionName: "sessions",
-            ttl: 14 * 24 * 60 * 60
+            ttl: 365 * 24 * 60 * 60
         }),
         cookie: {
             httpOnly: true,
             path: "/",
             sameSite: isProduction && !process.env.VERCEL ? "none" : "lax",
-            secure: isProduction
+            secure: isProduction,
+            maxAge: 365 * 24 * 60 * 60 * 1000
         }
     });
 };

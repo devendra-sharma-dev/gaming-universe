@@ -40,6 +40,23 @@ const ticTacToeMatchSchema = new mongoose.Schema(
             index: true
         },
 
+        variant: {
+            type: String,
+            enum: ["standard", "infinite"],
+            default: "standard",
+            index: true
+        },
+
+        xMoves: {
+            type: [Number],
+            default: []
+        },
+
+        oMoves: {
+            type: [Number],
+            default: []
+        },
+
         players: {
             type: [playerSchema],
             default: []

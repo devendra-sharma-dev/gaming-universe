@@ -1,0 +1,3301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Cricket Championship — Arcade Edition | Gaming Universe</title>
+<link rel="stylesheet" href="./css/main.css?v=typography-v3">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #020812;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+canvas {
+    display: block;
+    position: absolute;
+    image-rendering: auto;
+    z-index: 10;
+}
+.auth-overlay {
+    z-index: 9999 !important;
+}
+</style>
+<script src="./js/session.js?v=typography-v3"></script>
+</head>
+<body>
+
+<!-- GLOBAL GAMING UNIVERSE NAVIGATION -->
+<header class="main-navigation" role="banner">
+    <a href="./index.html" class="brand" aria-label="Gaming Universe Home">
+        <span class="brand-controller" aria-hidden="true">
+            <span class="controller-body">
+                <span class="controller-stick controller-stick-left"></span>
+                <span class="controller-stick controller-stick-right"></span>
+                <span class="controller-dpad"></span>
+                <span class="controller-buttons">
+                    <span></span><span></span><span></span><span></span>
+                </span>
+            </span>
+        </span>
+        <span class="brand-name">GAMING <strong>UNIVERSE</strong></span>
+    </a>
+
+    <div class="navigation-search" role="search">
+        <input id="game-search" type="search" placeholder="SEARCH GAMES" autocomplete="off" aria-label="Search games">
+        <div id="game-search-results" class="game-search-results" hidden></div>
+    </div>
+
+    <nav class="navigation-links" aria-label="Main Navigation">
+        <a href="./index.html" class="navigation-link">HOME</a>
+        <a href="./cricket.html" class="navigation-link active" aria-current="page">CRICKET</a>
+    </nav>
+
+    <div class="navigation-player" id="player-menu-button" role="button" tabindex="0" aria-label="Open account panel">
+        <span class="player-status" id="cricket-player-status" aria-hidden="true"></span>
+        <span class="player-name" id="cricket-player-name">GUEST</span>
+    </div>
+</header>
+
+<!-- GAMING UNIVERSE IDENTITY / AUTH MODAL -->
+<div class="auth-overlay" id="auth-overlay" aria-hidden="true" hidden>
+    <section class="auth-panel" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+        <button class="auth-close-button" id="auth-close-button" type="button" aria-label="Close account panel">×</button>
+        <span class="auth-kicker">GAMING UNIVERSE IDENTITY</span>
+        <h2 id="auth-title">ENTER THE <span>UNIVERSE</span></h2>
+        <p class="auth-message" id="auth-message" aria-live="polite"></p>
+        <div id="auth-view"></div>
+        <div class="auth-navigation" id="auth-navigation">
+            <button type="button" data-auth-switch="login">USE ANOTHER EMAIL</button>
+        </div>
+    </section>
+</div>
+
+<canvas id="gc"></canvas>
+<script>
+(() => {
+'use strict';
+
+/* ==========================================================================
+   1. CONSTANTS, TEAM RATINGS & STRENGTH CONFIGURATION
+   ========================================================================== */
+
+const W = 450, H = 800;
+const canvas = document.getElementById('gc');
+const ctx = canvas.getContext('2d');
+canvas.width = W; canvas.height = H;
+
+/**
+ * 8 International Teams with Realistic Relative Strengths:
+ * Tier 1 (Elite): India (96), Australia (95) -> Sets highest targets, high pace
+ * Tier 2 (Strong): England (89), South Africa (87), New Zealand (85) -> Strong targets
+ * Tier 3 (Challengers): Pakistan (79), West Indies (75), Sri Lanka (72) -> Lower targets
+ */
+const TEAMS = [
+    { name:'India',        code:'IND', primary:'#0066CC', secondary:'#FF9933', rating:96, stars:'★★★★★', tier:'Elite Tier 1',      tag:'Highest Targets · Formidable All-Rounders', targetMod:6,  speedMod:0.07, swingMod:3 },
+    { name:'Australia',    code:'AUS', primary:'#FFCD00', secondary:'#006847', rating:95, stars:'★★★★★', tier:'Elite Tier 1',      tag:'Highest Targets · Lethal Pace Attack',      targetMod:5,  speedMod:0.08, swingMod:4 },
+    { name:'England',      code:'ENG', primary:'#CF142B', secondary:'#00247D', rating:89, stars:'★★★★☆', tier:'Strong Tier 2',     tag:'Strong Targets · Aggressive Strokeplay',    targetMod:3,  speedMod:0.04, swingMod:2 },
+    { name:'South Africa', code:'RSA', primary:'#007749', secondary:'#FFB81C', rating:87, stars:'★★★★☆', tier:'Strong Tier 2',     tag:'Competitive Targets · Express Fast Bowling', targetMod:2, speedMod:0.05, swingMod:2 },
+    { name:'New Zealand',  code:'NZL', primary:'#1a1a1a', secondary:'#FFFFFF', rating:85, stars:'★★★★☆', tier:'Strong Tier 2',     tag:'Disciplined Targets · Precision Swing',     targetMod:1,  speedMod:0.02, swingMod:3 },
+    { name:'Pakistan',     code:'PAK', primary:'#00882B', secondary:'#FFFFFF', rating:79, stars:'★★★☆☆', tier:'Moderate Tier 3',   tag:'Moderate Targets · Reverse Swing & Pace',   targetMod:-2, speedMod:0.03, swingMod:5 },
+    { name:'West Indies',  code:'WIN', primary:'#7B2D26', secondary:'#FFC72C', rating:75, stars:'★★★☆☆', tier:'Moderate Tier 3',   tag:'Moderate Targets · Power Hitters',          targetMod:-4, speedMod:-0.02, swingMod:-2 },
+    { name:'Sri Lanka',    code:'SLK', primary:'#0033A0', secondary:'#FFB81C', rating:72, stars:'★★★☆☆', tier:'Lower Tier 3',      tag:'Lower Targets · Rebuilding Unit & Spin',    targetMod:-6, speedMod:-0.04, swingMod:1 },
+];
+
+/* Progressive difficulty definitions */
+const DIFF = [
+    { name:'Quarter-Final', speed:0.80, swing:14, label:'Predictable medium pace' },
+    { name:'Semi-Final',    speed:0.98, swing:24, label:'Pace with subtle swing' },
+    { name:'Grand Final',   speed:1.18, swing:36, label:'Aggressive pace & late swing' },
+];
+
+/* Timing windows in milliseconds */
+const TIMING = { PERFECT: 52, GOOD: 120, MISTIMED: 200 };
+
+const COMMENTARY = {
+    six:    ['MASSIVE SIX!','OUT OF THE GROUND!','WHAT A MAGNIFICENT HIT!','INTO THE STANDS!','CRACKING SHOT FOR SIX!'],
+    four:   ['CRACKING FOUR!','RACING TO THE BOUNDARY!','GLORIOUS STROKE!','PIERCED THE GAP!','BULLET TO THE FENCE!'],
+    runs:   ['Sharp running!','Quick single taken!','Pushed into the gap!','Good hustle between wickets!'],
+    dot:    ['Dot ball. Solid bowling.','Beaten outside off!','Straight to the fielder. No run.','Tidy line and length.'],
+    caught: ['CAUGHT! Gone!','HIGH IN THE AIR... TAKEN!','EDGED AND TAKEN!','MISTIMED... CAUGHT IN THE DEEP!'],
+    bowled: ['CLEAN BOWLED!','OFF STUMP UPROOTED!','TIMBER! Knocked him over!','BEATEN ALL ENDS UP!'],
+    miss:   ['Swing and a miss!','Beaten by pace!','Through to the keeper!','Past the outside edge!'],
+};
+
+/* ==========================================================================
+   2. CANVAS RESIZE & DPI
+   ========================================================================== */
+
+function resize() {
+    const isMobile = window.innerWidth <= 640;
+    const navOffset = isMobile ? 80 : 116;
+    const availW = Math.max(300, window.innerWidth - (isMobile ? 12 : 32));
+    const availH = Math.max(400, window.innerHeight - navOffset - 16);
+    const r = W / H;
+    let cw = availW, ch = availH;
+    if (cw / ch > r) {
+        cw = ch * r;
+    } else {
+        ch = cw / r;
+    }
+    canvas.style.width = Math.floor(cw) + 'px';
+    canvas.style.height = Math.floor(ch) + 'px';
+    canvas.style.left = '50%';
+    canvas.style.top = Math.floor(navOffset + (availH / 2)) + 'px';
+    canvas.style.transform = 'translate(-50%, -50%)';
+}
+window.addEventListener('resize', resize);
+resize();
+
+function canvasCoords(cx, cy) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (cx - r.left) / r.width * W, y: (cy - r.top) / r.height * H };
+}
+
+/* ==========================================================================
+   3. AUDIO SYNTHESIS
+   ========================================================================== */
+
+let audioCtx = null;
+function ensureAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+}
+
+function playTone(freq, dur, type, vol) {
+    if (!audioCtx) return;
+    try {
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type || 'sine';
+        o.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        g.gain.setValueAtTime(vol || 0.08, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        o.connect(g);
+        g.connect(audioCtx.destination);
+        o.start();
+        o.stop(audioCtx.currentTime + dur);
+    } catch (_) {}
+}
+
+function sfxHit() {
+    playTone(920, 0.07, 'square', 0.12);
+    playTone(1350, 0.05, 'sine', 0.08);
+}
+function sfxBounce() {
+    playTone(280, 0.05, 'triangle', 0.09);
+    playTone(140, 0.08, 'sine', 0.06);
+}
+function sfxWicket() {
+    playTone(170, 0.28, 'sawtooth', 0.12);
+    playTone(95, 0.38, 'sawtooth', 0.08);
+}
+function sfxClick() {
+    playTone(650, 0.03, 'sine', 0.05);
+}
+function sfxCheer() {
+    playTone(520, 0.18, 'sine', 0.08);
+    playTone(780, 0.15, 'sine', 0.06);
+}
+
+/* ==========================================================================
+   4. STRENGTH-ADJUSTED TARGET GENERATION
+   ========================================================================== */
+
+function randInt(a, b) {
+    return Math.floor(Math.random() * (b - a + 1)) + a;
+}
+
+function generateBaseTarget(mode, round) {
+    if (mode === 'tournament') {
+        if (round === 0) return randInt(25, 31);
+        if (round === 1) return randInt(36, 42);
+        return randInt(46, 52);
+    }
+    const roll = Math.random();
+    if (roll < 0.80) {
+        return randInt(33, 41);
+    } else if (roll < 0.95) {
+        return randInt(42, 47);
+    } else {
+        return randInt(48, 52);
+    }
+}
+
+function calculateTarget(playerTeam, opponentTeam, mode, round) {
+    const base = generateBaseTarget(mode, round);
+    const oppMod = opponentTeam ? (opponentTeam.targetMod || 0) : 0;
+    let target = base + oppMod;
+
+    if (mode === 'tournament') {
+        if (round === 0) target = clamp(target, 20, 36);
+        else if (round === 1) target = clamp(target, 30, 48);
+        else target = clamp(target, 42, 58);
+    } else {
+        target = clamp(target, 24, 56);
+    }
+    return target;
+}
+
+/* ==========================================================================
+   5. GAME STATE
+   ========================================================================== */
+
+const G = {
+    screen: 'menu',
+    mode: null,
+    playerTeam: null,
+    opponentTeam: null,
+    round: 0,
+    tournamentOpponents: [],
+    difficulty: 1,
+
+    target: 0,
+    get targetScore() { return this.target; },
+    get currentRuns() { return this.runs; },
+    get wicketsLost() { return this.wickets; },
+    get ballsBowled() { return this.balls; },
+    get currentOver() { return Math.floor(this.balls / 6); },
+
+    runs: 0,
+    wickets: 0,
+    balls: 0,
+    fours: 0,
+    sixes: 0,
+    dots: 0,
+    matchResult: null,
+
+    /* In-play state */
+    phase: 'wait',
+    waitTimer: 0,
+    bowlerAnim: 0,
+
+    /* Delivery Vector */
+    ballProgress: 0,
+    ballSpeed: 1,
+    ballLine: 0,
+    ballSwing: 0,
+    ballLength: 'good',
+    pitchPt: 0.52,
+    pitchRings: [],
+    ballActive: false,
+    deliveryStart: 0,
+    idealSwingTime: 0,
+    resultProcessed: false,
+    hasBounced: false,
+
+    /* Batsman Stance & Swing */
+    hasSwung: false,
+    swingTime: 0,
+    swingPhase: 0,
+    swinging: false,
+    batTapTimer: 0,
+    missTimer: 0,
+
+    /* Timing Meter State */
+    timingMarkerPos: null,
+    timingResult: null,
+
+    /* Shot animation */
+    shotAnimProg: 0,
+    shotTargetX: 0,
+    shotTargetY: 0,
+
+    /* Result overlay */
+    resultTimer: 0,
+    lastResult: null,
+    commentary: '',
+
+    /* FX */
+    particles: [],
+    shakeAmount: 0,
+
+    /* First ball help */
+    firstBall: true,
+    isSuperOver: false,
+    maxBalls: 12,
+    maxWickets: 3,
+};
+
+function resetInnings() {
+    G.runs = 0; G.wickets = 0; G.balls = 0;
+    G.fours = 0; G.sixes = 0; G.dots = 0;
+    G.lastResult = null; G.matchResult = null;
+    G.timingResult = null; G.timingMarkerPos = null;
+    G.firstBall = true; G.particles = [];
+    G.pitchRings = [];
+    G.swingPhase = 0; G.swinging = false; G.shakeAmount = 0;
+}
+
+/* ==========================================================================
+   6. UI BUTTONS & UTILITIES
+   ========================================================================== */
+
+let buttons = [];
+function clearBtns() { buttons = []; }
+function addBtn(x, y, w, h, text, cb, color, subtext) {
+    buttons.push({ x, y, w, h, text, cb, color: color || null, subtext: subtext || null });
+}
+
+function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);   ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);   ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);     ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+}
+
+function drawBtn(b) {
+    const fill = b.color ? b.color : 'rgba(255,255,255,0.08)';
+    const stroke = b.color ? b.color : 'rgba(0,210,255,0.4)';
+    ctx.fillStyle = fill;
+    ctx.globalAlpha = b.color ? 0.35 : 1;
+    roundRect(b.x, b.y, b.w, b.h, 12); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 1.5;
+    roundRect(b.x, b.y, b.w, b.h, 12); ctx.stroke();
+
+    if (b.subtext) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 14px "Segoe UI",Arial,sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(b.text, b.x + b.w / 2, b.y + b.h / 2 - 8);
+
+        ctx.fillStyle = '#ffd700';
+        ctx.font = 'bold 11px "Segoe UI",Arial,sans-serif';
+        ctx.fillText(b.subtext, b.x + b.w / 2, b.y + b.h / 2 + 10);
+    } else {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 15px "Segoe UI",Arial,sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(b.text, b.x + b.w / 2, b.y + b.h / 2);
+    }
+}
+
+function drawAllBtns() {
+    buttons.forEach(drawBtn);
+}
+
+function hitBtn(px, py) {
+    for (let i = buttons.length - 1; i >= 0; i--) {
+        const b = buttons[i];
+        if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) {
+            b.cb();
+            return true;
+        }
+    }
+    return false;
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = randInt(0, i);
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+}
+
+/* ==========================================================================
+   7. STADIUM ENVIRONMENT & ACCURATE PITCH GEOMETRY
+   ========================================================================== */
+
+/**
+ * Proper Broadcast Pitch Geometry:
+ * Bowler End (top of pitch): y = H * 0.38 (304px), width = 44px
+ * Batsman End (crease):      y = H * 0.80 (640px), width = 112px
+ */
+const PITCH_GEOM = {
+    topY: H * 0.38,
+    botY: H * 0.80,
+    topW: 44,
+    botW: 112,
+    cx: W / 2,
+};
+
+/**
+ * Authentic 30-Yard Fielding Circle:
+ * Encloses the entire pitch (bowler end 304px, batsman end 640px)
+ * Circle reaches from y = 272px (above bowler) to y = 688px (below batsman).
+ */
+const THIRTY_YARD_CIRCLE = {
+    cx: W / 2,
+    cy: 480,
+    rx: 202,
+    ry: 208,
+};
+
+function getPitchY(z) {
+    return lerp(PITCH_GEOM.botY, PITCH_GEOM.topY, Math.pow(z, 0.72));
+}
+
+function proj(wx, wz) {
+    const z = clamp(wz, 0, 1);
+    const sy = getPitchY(z);
+    const scale = lerp(1.0, 0.36, z);
+    const sx = PITCH_GEOM.cx + wx * scale;
+    return { x: sx, y: sy, s: scale };
+}
+
+/**
+ * Realistic Dark Grandstand & Sky (Replaces the multi-colored blocky crowd grid)
+ */
+function drawSkyAndStadium() {
+    // Night stadium twilight sky
+    const sky = ctx.createLinearGradient(0, 0, 0, H * 0.32);
+    sky.addColorStop(0, '#040d1a');
+    sky.addColorStop(0.5, '#0b1d33');
+    sky.addColorStop(1, '#14314f');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H * 0.32);
+
+    // Stadium Floodlights
+    drawFloodlight(45, 45);
+    drawFloodlight(W - 45, 45);
+
+    // Dark Atmospheric Grandstand Tiers (Clean & Realistic, NO rainbow squares!)
+    const standY = H * 0.20, standH = 58;
+    const standGrad = ctx.createLinearGradient(0, standY, 0, standY + standH);
+    standGrad.addColorStop(0, '#091321');
+    standGrad.addColorStop(0.5, '#121e30');
+    standGrad.addColorStop(1, '#0e1828');
+    ctx.fillStyle = standGrad;
+    ctx.fillRect(0, standY, W, standH);
+
+    // Realistic soft stadium tiers & shaded spectators
+    ctx.save();
+    for (let r = 0; r < 5; r++) {
+        const rowY = standY + 6 + r * 10;
+        // Tier dividing line
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, rowY); ctx.lineTo(W, rowY);
+        ctx.stroke();
+
+        // Subtle dark crowd silhouettes
+        ctx.fillStyle = r % 2 === 0 ? 'rgba(25,40,65,0.7)' : 'rgba(18,28,45,0.7)';
+        ctx.fillRect(0, rowY + 1, W, 8);
+    }
+
+    // Boundary LED Ribbon Display Board (Sleek professional ribbon)
+    const ledGrad = ctx.createLinearGradient(0, 0, W, 0);
+    ledGrad.addColorStop(0, '#0a2238');
+    ledGrad.addColorStop(0.3, '#10395c');
+    ledGrad.addColorStop(0.5, '#195484');
+    ledGrad.addColorStop(0.7, '#10395c');
+    ledGrad.addColorStop(1, '#0a2238');
+    ctx.fillStyle = ledGrad;
+    ctx.fillRect(0, standY + standH - 4, W, 6);
+
+    ctx.fillStyle = 'rgba(0,210,255,0.85)';
+    ctx.font = 'bold 9px "Segoe UI",Arial,sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('CRICKET CHAMPIONSHIP  ·  WORLD SERIES  ·  OFFICIAL MATCH', W / 2, standY + standH + 1);
+    ctx.restore();
+}
+
+function drawFloodlight(x, y) {
+    ctx.save();
+    ctx.strokeStyle = '#3b4e63';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x - 8, y + 28); ctx.lineTo(x, y);
+    ctx.moveTo(x + 8, y + 28); ctx.lineTo(x, y);
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = '#00d2ff';
+    ctx.shadowBlur = 14;
+    for (let i = -2; i <= 2; i++) {
+        for (let j = 0; j <= 1; j++) {
+            ctx.beginPath();
+            ctx.arc(x + i * 5, y + j * 5, 2.2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    ctx.shadowBlur = 0;
+    const beam = ctx.createRadialGradient(x, y, 4, x, y + 160, 200);
+    beam.addColorStop(0, 'rgba(180,230,255,0.11)');
+    beam.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = beam;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - 110, y + 250);
+    ctx.lineTo(x + 110, y + 250);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawOutfield() {
+    const outfieldTop = H * 0.28;
+    const grass = ctx.createLinearGradient(0, outfieldTop, 0, H);
+    grass.addColorStop(0, '#155229');
+    grass.addColorStop(0.4, '#1c6d37');
+    grass.addColorStop(1, '#248344');
+    ctx.fillStyle = grass;
+    ctx.fillRect(0, outfieldTop, W, H - outfieldTop);
+
+    // Subtle mowing circular striping
+    ctx.save();
+    ctx.lineWidth = 14;
+    for (let i = 0; i < 9; i++) {
+        ctx.strokeStyle = i % 2 === 0 ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.035)';
+        ctx.beginPath();
+        ctx.arc(W / 2, H * 0.82, 80 + i * 36, Math.PI * 0.95, Math.PI * 2.05);
+        ctx.stroke();
+    }
+
+    // 1. Boundary Rope: Right in front of the ad boards ("CRICKET CHAMPIONSHIP · WORLD SERIES")
+    const boundaryY = 227;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(0, boundaryY);
+    ctx.lineTo(W, boundaryY);
+    ctx.stroke();
+
+    // Foam advertising boundary wedges along the boundary rope
+    for (let bx = 20; bx < W; bx += 42) {
+        ctx.fillStyle = '#0a233c';
+        ctx.beginPath();
+        ctx.moveTo(bx - 12, boundaryY + 2);
+        ctx.lineTo(bx, boundaryY - 4);
+        ctx.lineTo(bx + 12, boundaryY + 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#00d2ff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+
+    // 2. Large 30-Yard Infield Circle (Entire Pitch is completely INSIDE!)
+    const circleCy = THIRTY_YARD_CIRCLE.cy;
+    const circleRx = THIRTY_YARD_CIRCLE.rx;
+    const circleRy = THIRTY_YARD_CIRCLE.ry;
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.38)';
+    ctx.setLineDash([6, 8]);
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.ellipse(W / 2, circleCy, circleRx, circleRy, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 20 White fielding discs evenly spaced along the 30-yard circle line
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 20; i++) {
+        const ang = (i / 20) * Math.PI * 2;
+        const dx = W / 2 + Math.cos(ang) * circleRx;
+        const dy = circleCy + Math.sin(ang) * circleRy;
+        ctx.beginPath();
+        ctx.ellipse(dx, dy, 2.8, 1.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
+function drawPitch() {
+    const { topY, botY, topW, botW, cx } = PITCH_GEOM;
+
+    // Pitch clay surface
+    const pitchGrad = ctx.createLinearGradient(0, topY, 0, botY);
+    pitchGrad.addColorStop(0, '#a38a53');
+    pitchGrad.addColorStop(0.35, '#bfab70');
+    pitchGrad.addColorStop(0.75, '#d0bc82');
+    pitchGrad.addColorStop(1, '#dfcd93');
+    ctx.fillStyle = pitchGrad;
+
+    ctx.beginPath();
+    ctx.moveTo(cx - topW / 2, topY);
+    ctx.lineTo(cx + topW / 2, topY);
+    ctx.lineTo(cx + botW / 2, botY);
+    ctx.lineTo(cx - botW / 2, botY);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(70,95,45,0.35)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Subtle roller wear lines
+    ctx.strokeStyle = 'rgba(120,100,50,0.18)';
+    ctx.lineWidth = 0.8;
+    for (let i = 1; i < 8; i++) {
+        const t = i / 8;
+        const y = lerp(topY, botY, t);
+        const w = lerp(topW, botW, t);
+        ctx.beginPath();
+        ctx.moveTo(cx - w / 2 + 4, y);
+        ctx.lineTo(cx + w / 2 - 4, y);
+        ctx.stroke();
+    }
+
+    // Bowling crease at bowler's end
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - topW / 2 + 4, topY + 14);
+    ctx.lineTo(cx + topW / 2 - 4, topY + 14);
+    ctx.stroke();
+
+    // Batting Popping Crease line
+    const popY = botY - 26;
+    const popW = botW / 2 + 16;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - popW, popY);
+    ctx.lineTo(cx + popW, popY);
+    ctx.stroke();
+
+    // Return creases
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(cx - botW / 2 + 3, popY);
+    ctx.lineTo(cx - botW / 2 + 3, botY);
+    ctx.moveTo(cx + botW / 2 - 3, popY);
+    ctx.lineTo(cx + botW / 2 - 3, botY);
+    ctx.stroke();
+}
+
+/**
+ * Stumps:
+ * Near Stumps (behind batsman): Drawn at botY + 8 (behind popping crease!)
+ */
+function drawStumps(near) {
+    const cx = W / 2;
+    let by, sh, sg, sw;
+    if (near) {
+        by = PITCH_GEOM.botY + 8; // Standing behind the batsman!
+        sh = 34; sg = 7.5; sw = 3.2;
+    } else {
+        by = PITCH_GEOM.topY + 12;
+        sh = 13; sg = 3.2; sw = 1.6;
+    }
+
+    ctx.strokeStyle = '#f3e7cf';
+    ctx.lineWidth = sw;
+    for (let i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        ctx.moveTo(cx + i * sg, by);
+        ctx.lineTo(cx + i * sg, by - sh);
+        ctx.stroke();
+    }
+
+    // Bright RED Zing LED bails on top of wickets
+    ctx.strokeStyle = '#ff1a2a';
+    ctx.fillStyle = '#ff1a2a';
+    ctx.lineWidth = near ? 3.6 : 2.0;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - sg - 2, by - sh - 0.5);
+    ctx.lineTo(cx - 0.5, by - sh - (near ? 1.6 : 0.8));
+    ctx.moveTo(cx + 0.5, by - sh - (near ? 1.6 : 0.8));
+    ctx.lineTo(cx + sg + 2, by - sh - 0.5);
+    ctx.stroke();
+
+    // Zing LED glow dots on the bails
+    if (near) {
+        ctx.fillStyle = '#ff3344';
+        ctx.beginPath(); ctx.arc(cx - sg * 0.5, by - sh - 1, 2.0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + sg * 0.5, by - sh - 1, 2.0, 0, Math.PI * 2); ctx.fill();
+    }
+}
+
+/* ==========================================================================
+   8. REALISTIC FIELDERS ON THE GREEN GROUND (ZERO on the pitch!)
+   ========================================================================== */
+
+/**
+ * 10 Fielders spread strictly on the green grass of the outfield ground:
+ * Every coordinate is calculated so |x| is far beyond the pitch boundary!
+ */
+/**
+ * Authentic International Cricket Field Placement (10 Fielders):
+ * - Wicket-Keeper: crouched directly behind stumps
+ * - 30-Yard Circle Fielders: Point, Cover, Extra Cover, Mid-Off, Mid-On, Mid-Wicket, Square Leg
+ * - Deep Boundary Fielders: Long-Off & Deep Mid-Wicket visible right at the boundary rope!
+ */
+const FIELD_POSITIONS = [
+    // 1. Wicket Keeper (behind stumps on off-stump line)
+    { role:'keeper',     x: 22,   z: -0.04, label:'Wicket Keeper' },
+
+    // 2. Point (off-side backward of square on 30-yard ring)
+    { role:'point',      x: 235,  z: 0.18,  label:'Point' },
+
+    // 3. Cover (off-side on 30-yard ring)
+    { role:'cover',      x: 265,  z: 0.42,  label:'Cover' },
+
+    // 4. Extra Cover (off-side deep infield on 30-yard ring)
+    { role:'extracover', x: 230,  z: 0.65,  label:'Extra Cover' },
+
+    // 5. Mid-Off (infield near bowler's end, off-side)
+    { role:'midoff',     x: 105,  z: 0.80,  label:'Mid-Off' },
+
+    // 6. Mid-On (infield near bowler's end, leg-side)
+    { role:'midon',      x: -105, z: 0.80,  label:'Mid-On' },
+
+    // 7. Mid-Wicket (leg-side forward of square on 30-yard ring)
+    { role:'midwicket',  x: -250, z: 0.45,  label:'Mid-Wicket' },
+
+    // 8. Square Leg (leg-side square of wicket on 30-yard ring)
+    { role:'sqleg',      x: -230, z: 0.18,  label:'Square Leg' },
+
+    // 9. Long-Off (DEEP BOUNDARY FIELDER near the boundary rope!)
+    { role:'longoff',    x: 185,  z: 0.94,  label:'Long-Off (Boundary)' },
+
+    // 10. Deep Mid-Wicket / Long-On (DEEP BOUNDARY FIELDER near the boundary rope!)
+    { role:'deepmid',    x: -195, z: 0.94,  label:'Deep Mid-Wkt (Boundary)' },
+];
+
+/**
+ * Draws each fielder physically facing towards the batsman!
+ * Head, cap visor, shoulders and crouch point towards (targetX, targetY).
+ */
+function drawFielderFigure(fx, fy, scale, teamColor, isKeeper) {
+    const targetX = W / 2 - 20;
+    const targetY = PITCH_GEOM.botY - 24;
+    const dx = targetX - fx;
+    const dy = targetY - fy;
+    const dist = Math.hypot(dx, dy) || 1;
+    const nx = dx / dist; // facing direction horizontally (-1 left, +1 right)
+    const ny = dy / dist; // facing direction vertically (positive = downwards toward batsman)
+
+    ctx.save();
+    ctx.translate(fx, fy);
+    ctx.scale(scale, scale);
+
+    // Ground grass shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.beginPath();
+    ctx.ellipse(0, 16, 12, 4.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Spikes (Shoes angled towards the pitch)
+    ctx.fillStyle = '#ffffff';
+    if (nx > 0) {
+        // Looking to the right towards batsman
+        ctx.fillRect(-7, 13, 5, 4);
+        ctx.fillRect(1, 13, 6, 4);
+    } else {
+        // Looking to the left towards batsman
+        ctx.fillRect(-7, 13, 6, 4);
+        ctx.fillRect(2, 13, 5, 4);
+    }
+
+    // Full Country Kit: Trousers matching Jersey in teamColor!
+    ctx.fillStyle = teamColor;
+    ctx.beginPath();
+    const legLean = nx * 2.5;
+    ctx.moveTo(-6 + legLean, 2); ctx.lineTo(-8, 14); ctx.lineTo(-3, 14); ctx.lineTo(-2 + legLean, 2);
+    ctx.moveTo(2 + legLean, 2);  ctx.lineTo(3, 14);  ctx.lineTo(8, 14);  ctx.lineTo(6 + legLean, 2);
+    ctx.fill();
+
+    // Torso (Jersey angled towards batsman)
+    ctx.fillStyle = teamColor;
+    ctx.beginPath();
+    roundRect(-8 + legLean, -14, 16, 18, 3);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillRect(-6 + legLean, -14, 12, 3);
+
+    // Arms in athletic ready fielding position
+    ctx.strokeStyle = teamColor;
+    ctx.lineWidth = 3.2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+
+    if (isKeeper) {
+        // Wicket-keeper crouched behind stumps, looking forward at bowler
+        ctx.moveTo(-7, -8); ctx.lineTo(-11, 0); ctx.lineTo(-4, 6);
+        ctx.moveTo(7, -8);  ctx.lineTo(11, 0);  ctx.lineTo(4, 6);
+        ctx.stroke();
+        // Bright keeping gloves cupped
+        ctx.fillStyle = '#ffcc00';
+        ctx.beginPath(); ctx.arc(-4, 6, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(4, 6, 4, 0, Math.PI * 2);  ctx.fill();
+    } else {
+        // Outfielders: cupped hands ready facing batsman
+        const handX = nx * 4;
+        ctx.moveTo(-7 + legLean, -8); ctx.lineTo(-10 + handX * 0.5, 2); ctx.lineTo(-5 + handX, 8);
+        ctx.moveTo(7 + legLean, -8);  ctx.lineTo(10 + handX * 0.5, 2);  ctx.lineTo(5 + handX, 8);
+        ctx.stroke();
+
+        ctx.fillStyle = '#f1c27d';
+        ctx.beginPath(); ctx.arc(-5 + handX, 8, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(5 + handX, 8, 2.5, 0, Math.PI * 2);  ctx.fill();
+    }
+
+    // Head turned directly towards the batsman!
+    const headX = nx * 3.5;
+    const headY = -20 + (ny > 0 ? 1 : -1);
+
+    ctx.fillStyle = '#f1c27d';
+    ctx.beginPath();
+    ctx.arc(headX, headY, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Team Cap
+    ctx.fillStyle = teamColor;
+    ctx.beginPath();
+    ctx.arc(headX, headY - 1.5, 5.8, Math.PI, Math.PI * 2);
+    ctx.fill();
+
+    // Cap Visor Peak POINTING IN THE DIRECTION OF THE BATSMAN!
+    const visorLen = 6.5;
+    const visorX = headX + (nx >= 0 ? 1 : -1) * 3;
+    const visorTipX = visorX + nx * visorLen;
+    const visorTipY = headY + ny * 2.5 - 1;
+
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.moveTo(headX - 4, headY - 2);
+    ctx.lineTo(visorTipX, visorTipY);
+    ctx.lineTo(headX + 4, headY - 2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+}
+
+/**
+ * Wicket-Keeper: Authentic Adult Human Proportions crouched behind stumps!
+ * Head reaches stump bails level, wears country-colored kit (jersey + pants + pads)
+ * and cupped wicket-keeping gloves.
+ */
+function drawWicketKeeper(opp) {
+    const kx = W / 2 + 20; // Standing on off-stump line behind stumps
+    const ky = PITCH_GEOM.botY + 28; // On grass behind stumps (y = 668)
+
+    ctx.save();
+    ctx.translate(kx, ky);
+
+    // Ground Grass Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.32)';
+    ctx.beginPath();
+    ctx.ellipse(0, 8, 16, 5.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Pure White Cricket Shoes
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(-12, 4, 8, 5);
+    ctx.fillRect(4, 4, 8, 5);
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillRect(-12, 7, 8, 2);
+    ctx.fillRect(4, 7, 8, 2);
+
+    // Trousers & Keeper Shin Pads in Opponent Country Color (opp.primary)
+    // Left crouched leg (keeper pad)
+    ctx.fillStyle = opp.primary;
+    roundRect(-13, -16, 9, 21, 3);
+    ctx.fill();
+    // Right crouched leg (keeper pad)
+    roundRect(4, -16, 9, 21, 3);
+    ctx.fill();
+
+    // Keeper pad ribs / straps
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.fillRect(-13, -9, 9, 2.5);
+    ctx.fillRect(-13, -4, 9, 2.5);
+    ctx.fillRect(4, -9, 9, 2.5);
+    ctx.fillRect(4, -4, 9, 2.5);
+
+    // Torso (Crouched athletic posture leaning forward towards incoming ball)
+    ctx.fillStyle = opp.primary;
+    ctx.beginPath();
+    roundRect(-11, -34, 22, 20, 4);
+    ctx.fill();
+
+    // Jersey accents
+    ctx.fillStyle = opp.secondary;
+    ctx.fillRect(-11, -34, 4, 20);
+    ctx.fillRect(7, -34, 4, 20);
+
+    // Arms bent forward holding catching gloves
+    ctx.strokeStyle = opp.primary;
+    ctx.lineWidth = 4.2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-9, -28); ctx.lineTo(-14, -16); ctx.lineTo(-6, -10);
+    ctx.moveTo(9, -28);  ctx.lineTo(14, -16);  ctx.lineTo(6, -10);
+    ctx.stroke();
+
+    // Large Authentic Wicket-Keeping Gloves (cupped ready at knee height)
+    ctx.fillStyle = '#ffffff';
+    roundRect(-10, -14, 8, 9, 2.5); ctx.fill();
+    roundRect(2, -14, 8, 9, 2.5);   ctx.fill();
+    // Webbing & rubber grip
+    ctx.fillStyle = opp.secondary;
+    ctx.fillRect(-8, -12, 4, 5);
+    ctx.fillRect(4, -12, 4, 5);
+    // Dark thumb contour
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(-10, -9, 2, 3);
+    ctx.fillRect(8, -9, 2, 3);
+
+    // Head & Cap (Adult head reaches y = 668 - 52 = 616px, level with stump bails!)
+    ctx.fillStyle = '#f1c27d';
+    ctx.beginPath();
+    ctx.arc(0, -42, 7.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Country Cap
+    ctx.fillStyle = opp.primary;
+    ctx.beginPath();
+    ctx.arc(0, -44, 7.8, Math.PI, Math.PI * 2);
+    ctx.fill();
+
+    // Cap Visor pointing up-screen towards bowler
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.moveTo(-5, -45);
+    ctx.lineTo(0, -52);
+    ctx.lineTo(5, -45);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+}
+
+function drawAllFielders() {
+    const opp = G.opponentTeam || TEAMS[1];
+
+    // 1. Wicket Keeper: realistic adult keeper crouched behind stumps (stump-height proportion)
+    drawWicketKeeper(opp);
+
+    // 2 & 3. Deep Boundary Fielders: Long-Off and Long-On standing right by the boundary rope in front of the ad boards!
+    // Long-Off (deep off-side boundary)
+    drawFielderFigure(325, 236, 0.46, opp.primary, false);
+    // Long-On (deep leg-side boundary)
+    drawFielderFigure(125, 236, 0.46, opp.primary, false);
+
+    // 4 to 10. The 7 Infielders positioned EXACTLY ON the 30-Yard Circle Line!
+    const circleFielders = [
+        { role: 'Mid-Off',     ang: -1.25 }, // Top-right curve of 30-yd ring
+        { role: 'Extra Cover', ang: -0.72 }, // Off-side deep ring
+        { role: 'Cover',       ang: -0.15 }, // Off-side ring
+        { role: 'Point',       ang:  0.48 }, // Off-side backward of square
+        { role: 'Square Leg',  ang: Math.PI - 0.48 }, // Leg-side backward of square
+        { role: 'Mid-Wicket',  ang: Math.PI + 0.20 }, // Leg-side ring
+        { role: 'Mid-On',      ang: -Math.PI + 1.25 }  // Top-left curve of 30-yd ring
+    ];
+
+    circleFielders.forEach(f => {
+        const fx = THIRTY_YARD_CIRCLE.cx + Math.cos(f.ang) * THIRTY_YARD_CIRCLE.rx;
+        const fy = THIRTY_YARD_CIRCLE.cy + Math.sin(f.ang) * THIRTY_YARD_CIRCLE.ry;
+        // Perspective depth scale from top (fy=272, scale 0.52) to bottom (fy=688, scale 1.02)
+        const depthT = (fy - (THIRTY_YARD_CIRCLE.cy - THIRTY_YARD_CIRCLE.ry)) / (THIRTY_YARD_CIRCLE.ry * 2);
+        const scale = lerp(0.52, 1.02, clamp(depthT, 0, 1));
+        drawFielderFigure(fx, fy, scale, opp.primary, false);
+    });
+}
+
+function drawBowler() {
+    const opp = G.opponentTeam || TEAMS[1];
+    const p = proj(0, 0.98);
+    const s = p.s * 1.25;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.scale(s, s);
+
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath();
+    ctx.ellipse(0, 16, 12, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(-6, 13, 5, 4);
+    ctx.fillRect(1, 13, 5, 4);
+
+    // Full Country Kit: Bowler pants match jersey!
+    ctx.fillStyle = opp.primary;
+    ctx.fillRect(-6, 2, 5, 12);
+    ctx.fillRect(1, 2, 5, 12);
+
+    ctx.fillStyle = opp.primary;
+    roundRect(-8, -14, 16, 18, 3);
+    ctx.fill();
+
+    ctx.fillStyle = '#f1c27d';
+    ctx.beginPath();
+    ctx.arc(0, -20, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = opp.secondary;
+    ctx.fillRect(-5, -23, 10, 3);
+
+    if (G.phase === 'bowling' || (G.phase === 'ball' && G.ballProgress < 0.08)) {
+        const a = clamp(G.bowlerAnim, 0, 1);
+        const armAngle = -Math.PI * 0.4 + a * Math.PI * 1.7;
+        const armLen = 16;
+        ctx.strokeStyle = '#f1c27d';
+        ctx.lineWidth = 3.5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(4, -10);
+        const handX = 4 + Math.cos(armAngle) * armLen;
+        const handY = -10 + Math.sin(armAngle) * armLen;
+        ctx.lineTo(handX, handY);
+        ctx.stroke();
+
+        if (a < 0.85) {
+            ctx.fillStyle = '#cc1122';
+            ctx.beginPath();
+            ctx.arc(handX, handY, 3.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    } else {
+        ctx.strokeStyle = '#f1c27d';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(-6, -10); ctx.lineTo(-10, -2);
+        ctx.moveTo(6, -10);  ctx.lineTo(9, -2);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+/* ==========================================================================
+   9. ATHLETIC BATSMAN IN FRONT OF WICKETS (Authentic Cricket Stance)
+   ========================================================================== */
+
+/**
+ * Batsman stands on the popping crease (IN FRONT of stumps!)
+ * Realistic side-on 3/4 stance, high front elbow, white pads with knee rolls,
+ * and helmet turned sharply down the pitch looking over front shoulder!
+ */
+/* ==========================================================================
+   9. RIGHT-HANDED BATSMAN: RIGID GRAPHICS & MICRO-ANIMATION PIPELINE
+   ========================================================================== */
+
+/**
+ * Production-ready Right-Handed Batsman 2D pipeline:
+ * - Positioned permanently on the Left Side of stumps (Leg-side/crease context).
+ * - Left shoulder & hip face up-screen towards bowler (side-on profile).
+ * - Right shoulder & hip face back-screen towards stumps/keeper.
+ * - Helmet turned left looking straight up-screen at incoming ball.
+ * - Two-hand grip: Left Hand on top guiding, Right Hand on bottom powering.
+ * - 4 Visual micro-animation phases: Idle Tap -> Back-Lift -> Swing -> Miss.
+ */
+/**
+ * ==========================================================================
+ * 9. ATHLETIC RIGHT-HANDED BATSMAN: AUTHENTIC SIDEWAYS PROFILE & MICRO-ANIMATIONS
+ * ==========================================================================
+ * - Authentic Right-Handed Sideways Stance:
+ *   * Body turned 85°-90° side-on: Left shoulder & hip facing UP-SCREEN toward bowler.
+ *   * Right shoulder & hip aligned back-screen toward stumps.
+ *   * Head turned 90° over left shoulder looking straight UP-SCREEN at the incoming ball.
+ *   * Clean, rounded cricket helmet in team.primary with smooth upward visor peak and face grille (no horns!).
+ *   * Slender, athletic torso in side profile (width ~17px, height ~31px) with team colors.
+ *   * Batsman Pads: Colored batting pads matching the jersey (team.primary) with knee rolls and stitched ribs!
+ *   * Cricket Shoes: Pure white cricket spikes (#ffffff).
+ *   * Two-hand clamped grip: Left hand high guiding, right hand low powering.
+ *   * 4 Micro-animation states: Idle Tap, Back-Lift, Swing & Follow-through, Miss.
+ */
+/* ==========================================================================
+   9. RIGHT-HANDED BATSMAN — REFERENCE-QUALITY ATHLETIC STANCE
+   ========================================================================== */
+
+/**
+ * Draws a tall, proportional right-handed batsman in authentic side-on stance
+ * matching professional cricket game art style.
+ *
+ * Visual reference: Tall athletic figure, 3/4 side-on view facing bowler.
+ * - Body slightly angled (left shoulder toward bowler, right shoulder back)
+ * - Head turned fully up-screen looking at the bowler
+ * - White batting pads with knee rolls
+ * - Team-colored jersey with accents
+ * - Bat held naturally down near the crease
+ * - 4 animation phases: Idle Tap → Back-Lift → Swing → Miss
+ */
+function drawBatsman() {
+    const team = G.playerTeam || TEAMS[0];
+
+    // Batsman stands on the popping crease, slightly left of stumps (leg-stump guard)
+    const bx = W / 2 - 16;
+    const by = PITCH_GEOM.botY - 18;
+
+    ctx.save();
+    ctx.translate(bx, by);
+
+    // ── ANIMATION STATE MACHINE ──
+    let tapOffset = 0;
+    let breathY = 0;
+    let batAngle = -0.50;
+    let batPivotX = 6;
+    let batPivotY = -8;
+    let leftElbowX = -12, leftElbowY = -14;
+    let torsoDip = 0;
+    let frontKneeBend = 0;
+
+    const isMissState = G.missTimer > 0 || (G.phase === 'result' && G.lastResult && (G.lastResult.type === 'bowled' || G.lastResult.type === 'miss' || G.lastResult.runs === 0));
+
+    if (isMissState) {
+        torsoDip = 5;
+        batAngle = -0.15;
+        batPivotX = 2;
+        batPivotY = -4;
+        leftElbowX = -10; leftElbowY = -8;
+        frontKneeBend = 3;
+    } else if (G.swinging || G.swingPhase > 0) {
+        const sp = clamp(G.swingPhase, 0, 1);
+        const contactMade = G.lastResult && G.lastResult.runs > 0;
+        if (contactMade) {
+            batAngle = lerp(-2.2, 1.85, Math.pow(sp, 0.85));
+            batPivotX = lerp(8, -12, sp);
+            batPivotY = lerp(-20, -28, sp);
+            leftElbowX = lerp(-12, -22, sp);
+            leftElbowY = lerp(-24, -32, sp);
+            frontKneeBend = lerp(0, 4, sp);
+        } else {
+            batAngle = lerp(-2.2, -0.60, Math.pow(sp, 0.9));
+            batPivotX = lerp(8, 0, sp);
+            batPivotY = lerp(-20, -10, sp);
+            leftElbowX = lerp(-12, -16, sp);
+            leftElbowY = lerp(-24, -18, sp);
+        }
+    } else if (G.phase === 'ball' || (G.phase === 'bowling' && G.bowlerAnim > 0.45)) {
+        const liftProg = G.phase === 'ball' ? clamp(G.ballProgress / 0.35, 0, 1) : clamp((G.bowlerAnim - 0.45) / 0.55, 0, 1);
+        batAngle = lerp(-0.50, -2.15, Math.pow(liftProg, 0.75));
+        batPivotX = lerp(6, 8, liftProg);
+        batPivotY = lerp(-8, -20, liftProg);
+        leftElbowX = lerp(-12, -16, liftProg);
+        leftElbowY = lerp(-14, -24, liftProg);
+    } else {
+        // IDLE TAP
+        const tapCycle = (G.batTapTimer % 0.8) / 0.8;
+        const tapPhase = Math.sin(tapCycle * Math.PI * 2);
+        tapOffset = Math.max(0, -tapPhase) * 6;
+        breathY = Math.sin(G.batTapTimer * Math.PI * 2 / 1.6) * 1.5;
+        batAngle = -0.50;
+        batPivotX = 6;
+        batPivotY = -8 - tapOffset + breathY;
+        leftElbowX = -12;
+        leftElbowY = -14 + breathY;
+    }
+
+    // ═══════════════════════════════════════
+    // GROUND SHADOW
+    // ═══════════════════════════════════════
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.beginPath();
+    ctx.ellipse(2, 24, 22, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ═══════════════════════════════════════
+    // SHOES — Pure White Cricket Spikes
+    // ═══════════════════════════════════════
+    // Back foot (right foot, inside crease near stumps)
+    ctx.fillStyle = '#ffffff';
+    roundRect(2, 22, 14, 5, 2.5); ctx.fill();
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillRect(3, 25, 12, 2);
+
+    // Front foot (left foot, slightly forward on pitch toward bowler)
+    ctx.fillStyle = '#ffffff';
+    roundRect(-16, 18 + torsoDip * 0.3 + frontKneeBend * 0.5, 14, 5, 2.5); ctx.fill();
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillRect(-15, 21 + torsoDip * 0.3 + frontKneeBend * 0.5, 12, 2);
+
+    // ═══════════════════════════════════════
+    // BATTING PADS — White with Knee Rolls (like reference image)
+    // ═══════════════════════════════════════
+    const padColor = '#f0f4f8';
+    const padStrap = '#d1d9e6';
+    const padHighlight = '#ffffff';
+
+    // Back Pad (Right Leg — closer to stumps)
+    ctx.fillStyle = padColor;
+    roundRect(3, 0, 13, 23, 4); ctx.fill();
+    // 3D highlight on front face
+    ctx.fillStyle = padHighlight;
+    ctx.fillRect(4, 1, 4, 21);
+    // Knee roll ridges
+    ctx.fillStyle = padStrap;
+    ctx.fillRect(4, 5, 11, 2.5);
+    ctx.fillRect(4, 10, 11, 2.5);
+    ctx.fillRect(4, 15, 11, 2.5);
+    // Subtle outline
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+    ctx.lineWidth = 0.8;
+    roundRect(3, 0, 13, 23, 4); ctx.stroke();
+
+    // Front Pad (Left Leg — forward toward bowler)
+    const fpY = -6 + torsoDip * 0.3 + frontKneeBend * 0.5;
+    ctx.fillStyle = padColor;
+    roundRect(-16, fpY, 13, 25, 4); ctx.fill();
+    ctx.fillStyle = padHighlight;
+    ctx.fillRect(-15, fpY + 1, 4, 23);
+    ctx.fillStyle = padStrap;
+    ctx.fillRect(-15, fpY + 4, 12, 2.5);
+    ctx.fillRect(-15, fpY + 9, 12, 2.5);
+    ctx.fillRect(-15, fpY + 14, 12, 2.5);
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+    ctx.lineWidth = 0.8;
+    roundRect(-16, fpY, 13, 25, 4); ctx.stroke();
+
+    // ═══════════════════════════════════════
+    // TORSO — Athletic Side-On Jersey
+    // ═══════════════════════════════════════
+    ctx.save();
+    ctx.translate(0, breathY + torsoDip);
+
+    // Main jersey body — side-on profile (narrower than front-on)
+    const jerseyGrad = ctx.createLinearGradient(-14, -38, 8, -4);
+    jerseyGrad.addColorStop(0, team.primary);
+    jerseyGrad.addColorStop(0.7, team.primary);
+    jerseyGrad.addColorStop(1, 'rgba(0,0,0,0.35)');
+    ctx.fillStyle = jerseyGrad;
+
+    // Torso shape — slightly tapered athletic build
+    ctx.beginPath();
+    ctx.moveTo(-11, -4);    // Left hip (front)
+    ctx.lineTo(-13, -20);   // Left waist
+    ctx.lineTo(-14, -32);   // Left shoulder (front shoulder facing bowler)
+    ctx.lineTo(-8, -36);    // Left shoulder top
+    ctx.lineTo(6, -36);     // Right shoulder top (back, away from bowler)
+    ctx.lineTo(8, -32);     // Right shoulder
+    ctx.lineTo(6, -20);     // Right waist
+    ctx.lineTo(5, -4);      // Right hip
+    ctx.closePath();
+    ctx.fill();
+
+    // Team accent stripe on front shoulder
+    ctx.fillStyle = team.secondary;
+    ctx.fillRect(-14, -36, 4, 32);
+
+    // V-neck collar
+    ctx.strokeStyle = team.secondary;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-8, -36);
+    ctx.lineTo(-3, -32);
+    ctx.lineTo(3, -36);
+    ctx.stroke();
+
+    // Team name on chest
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    ctx.font = 'bold 6px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(team.code, -3, -26);
+
+    // Jersey Number on back
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.font = 'bold 11px Arial';
+    ctx.fillText('7', 0, -18);
+
+    // ═══════════════════════════════════════
+    // HEAD & HELMET — Clean Rounded Helmet Facing Bowler
+    // ═══════════════════════════════════════
+    // Neck
+    ctx.fillStyle = '#d4a574';
+    ctx.fillRect(-5, -40, 7, 5);
+
+    // Head base (slightly turned toward bowler — 3/4 view)
+    ctx.fillStyle = '#d4a574';
+    ctx.beginPath();
+    ctx.ellipse(-2, -46, 8, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Helmet shell (covers top and sides of head)
+    ctx.fillStyle = team.primary;
+    ctx.beginPath();
+    ctx.arc(-2, -48, 9.5, Math.PI, Math.PI * 2 + 0.3);
+    ctx.fill();
+
+    // Helmet side panel
+    ctx.fillStyle = team.primary;
+    ctx.beginPath();
+    ctx.ellipse(-2, -47, 9.5, 8, 0, -0.5, 0.6);
+    ctx.fill();
+
+    // Helmet ear guard (left side, facing viewer in 3/4 view)
+    ctx.fillStyle = team.primary;
+    roundRect(-12, -50, 4, 10, 2); ctx.fill();
+
+    // Visor peak — clean short brim pointing UP-SCREEN at bowler
+    ctx.fillStyle = '#1a1a2e';
+    ctx.beginPath();
+    ctx.moveTo(-10, -50);
+    ctx.quadraticCurveTo(-8, -58, -1, -55);
+    ctx.lineTo(-4, -50);
+    ctx.closePath();
+    ctx.fill();
+
+    // Face grille (3 clean horizontal bars — stainless steel look)
+    ctx.strokeStyle = '#b0bec5';
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.moveTo(-12, -47); ctx.lineTo(-5, -44);
+    ctx.moveTo(-13, -44); ctx.lineTo(-5, -41);
+    ctx.moveTo(-12, -41); ctx.lineTo(-5, -38);
+    ctx.stroke();
+
+    // Grille vertical struts
+    ctx.beginPath();
+    ctx.moveTo(-10, -48); ctx.lineTo(-9, -38);
+    ctx.moveTo(-7, -48);  ctx.lineTo(-6, -38);
+    ctx.stroke();
+
+    ctx.restore(); // End Torso & Head Translation
+
+    // ═══════════════════════════════════════
+    // ARMS & HANDS — Two-Hand Bat Grip
+    // ═══════════════════════════════════════
+
+    // Left Arm (front guide arm — jersey sleeve color)
+    ctx.strokeStyle = team.primary;
+    ctx.lineWidth = 4.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-12, -26 + breathY + torsoDip); // Shoulder
+    ctx.lineTo(leftElbowX, leftElbowY + torsoDip); // Elbow
+    ctx.lineTo(batPivotX - 2, batPivotY - 4); // Wrist → top of bat handle
+    ctx.stroke();
+
+    // Exposed forearm skin below sleeve
+    ctx.strokeStyle = '#d4a574';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(leftElbowX, leftElbowY + torsoDip);
+    ctx.lineTo(batPivotX - 2, batPivotY - 4);
+    ctx.stroke();
+
+    // Right Arm (back power arm)
+    ctx.strokeStyle = team.primary;
+    ctx.lineWidth = 4.5;
+    ctx.beginPath();
+    ctx.moveTo(5, -22 + breathY + torsoDip); // Shoulder
+    ctx.lineTo(8, -14 + breathY + torsoDip); // Elbow
+    ctx.lineTo(batPivotX, batPivotY); // Wrist → bottom of bat handle
+    ctx.stroke();
+
+    ctx.strokeStyle = '#d4a574';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(8, -14 + breathY + torsoDip);
+    ctx.lineTo(batPivotX, batPivotY);
+    ctx.stroke();
+
+    // Batting Gloves (white leather with padded knuckle rolls)
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(batPivotX - 2, batPivotY - 4, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(batPivotX, batPivotY, 4, 0, Math.PI * 2); ctx.fill();
+    // Glove padding ridges
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillRect(batPivotX - 5, batPivotY - 6, 3, 3);
+    ctx.fillRect(batPivotX - 3, batPivotY - 2, 3, 3);
+
+    // ═══════════════════════════════════════
+    // BAT — English Willow with Realistic Proportions
+    // ═══════════════════════════════════════
+    ctx.save();
+    ctx.translate(batPivotX, batPivotY);
+    ctx.rotate(batAngle);
+
+    // Rubber Handle Grip (dark with chevron tape)
+    ctx.fillStyle = '#2d2d3f';
+    roundRect(0, -2.5, 12, 5, 1.5); ctx.fill();
+    // Grip tape chevrons
+    ctx.strokeStyle = '#6b7280';
+    ctx.lineWidth = 0.6;
+    for (let g = 2; g < 11; g += 2.5) {
+        ctx.beginPath();
+        ctx.moveTo(g, -2.5); ctx.lineTo(g + 1.5, 0); ctx.lineTo(g, 2.5);
+        ctx.stroke();
+    }
+
+    // Bat Shoulder (transition from handle to blade)
+    ctx.fillStyle = '#e8c96a';
+    roundRect(11, -3.5, 4, 7, 1); ctx.fill();
+
+    // Willow Blade (wood grain gradient)
+    const woodGrad = ctx.createLinearGradient(15, -6, 48, 6);
+    woodGrad.addColorStop(0, '#f5deb3');
+    woodGrad.addColorStop(0.3, '#deb887');
+    woodGrad.addColorStop(0.6, '#d2a55e');
+    woodGrad.addColorStop(1, '#b8860b');
+    ctx.fillStyle = woodGrad;
+    roundRect(15, -6, 30, 11, 2);
+    ctx.fill();
+
+    // Blade edge highlight (gives 3D depth)
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillRect(15, -6, 30, 3);
+
+    // Sponsor sticker (red with white logo)
+    ctx.fillStyle = '#dc2626';
+    roundRect(19, -4.5, 9, 8, 1.5); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 5px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('SS', 23.5, -0.5);
+
+    // Toe guard (protective rubber tip)
+    ctx.fillStyle = '#1a1a2e';
+    roundRect(43, -6, 3, 11, 1); ctx.fill();
+
+    ctx.restore(); // End Bat
+    ctx.restore(); // End Batsman
+}
+
+/* ==========================================================================
+   10. PITCH-OF-BALL CLARITY & DYNAMIC 3D BALL TRAJECTORY
+   ========================================================================== */
+
+function getBallPhysics(t) {
+    const z = 1 - t;
+    const p = proj(0, z);
+
+    const lateralAim = G.ballLine * 36;
+    const lateSwing = G.ballSwing * Math.pow(t, 2.2);
+    const screenX = p.x + (lateralAim + lateSwing) * p.s;
+
+    const bp = G.pitchPt;
+    let heightAbovePitch;
+
+    if (t < bp) {
+        const flightRatio = t / bp;
+        heightAbovePitch = lerp(34, 0, Math.pow(flightRatio, 1.4));
+    } else {
+        const bounceRatio = (t - bp) / (1 - bp);
+        if (G.ballLength === 'full' || G.ballLength === 'yorker') {
+            heightAbovePitch = Math.sin(bounceRatio * Math.PI * 0.7) * 9;
+        } else if (G.ballLength === 'short') {
+            heightAbovePitch = Math.sin(bounceRatio * Math.PI * 0.85) * 24;
+        } else {
+            heightAbovePitch = Math.sin(bounceRatio * Math.PI * 0.8) * 16;
+        }
+    }
+
+    const ballRadius = lerp(3.2, 9.8, t);
+    const groundY = p.y;
+    const ballY = groundY - heightAbovePitch * p.s * 1.4;
+
+    return {
+        x: screenX,
+        y: ballY,
+        groundY: groundY,
+        r: ballRadius,
+        h: heightAbovePitch,
+        scale: p.s,
+    };
+}
+
+function drawPitchLandingMarker() {
+    if (!G.ballActive || G.phase !== 'ball') return;
+
+    const bp = proj(0, 1 - G.pitchPt);
+    const aimX = bp.x + (G.ballLine * 36 + G.ballSwing * Math.pow(G.pitchPt, 2.2)) * bp.s;
+    const aimY = bp.y;
+
+    const pulse = (Math.sin(performance.now() / 90) + 1) * 0.5;
+    let ringColor = '#00e5ff';
+    let ringText = 'GOOD LENGTH';
+
+    if (G.ballLength === 'short') {
+        ringColor = '#ff9100'; ringText = 'SHORT PITCH';
+    } else if (G.ballLength === 'yorker') {
+        ringColor = '#ffd600'; ringText = 'YORKER';
+    } else if (G.ballLength === 'full') {
+        ringColor = '#00e676'; ringText = 'FULL PITCH';
+    }
+
+    ctx.save();
+    ctx.strokeStyle = ringColor;
+    ctx.lineWidth = 1.8;
+    ctx.globalAlpha = 0.4 + pulse * 0.45;
+    ctx.beginPath();
+    ctx.ellipse(aimX, aimY, (12 + pulse * 5) * bp.s * 2, (5 + pulse * 2) * bp.s * 2, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = ringColor;
+    ctx.globalAlpha = 0.35;
+    ctx.beginPath();
+    ctx.ellipse(aimX, aimY, 7 * bp.s * 2, 3 * bp.s * 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (G.ballProgress < G.pitchPt) {
+        ctx.globalAlpha = 0.85;
+        ctx.font = 'bold 9px "Segoe UI",Arial,sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(ringText, aimX, aimY - 10);
+    }
+    ctx.restore();
+}
+
+function spawnPitchImpact(x, y) {
+    G.pitchRings.push({ x, y, r: 4, alpha: 1.0 });
+    for (let i = 0; i < 10; i++) {
+        G.particles.push({
+            x, y,
+            vx: (Math.random() - 0.5) * 70,
+            vy: -15 - Math.random() * 35,
+            life: 0.4, maxLife: 0.4,
+            r: 2 + Math.random() * 2,
+            color: '#d4b868',
+        });
+    }
+}
+
+function updatePitchRings(dt) {
+    for (let i = G.pitchRings.length - 1; i >= 0; i--) {
+        const ring = G.pitchRings[i];
+        ring.r += dt * 45;
+        ring.alpha -= dt * 2.2;
+        if (ring.alpha <= 0) G.pitchRings.splice(i, 1);
+    }
+}
+
+function drawPitchRings() {
+    G.pitchRings.forEach(ring => {
+        ctx.save();
+        ctx.strokeStyle = '#ffffff';
+        ctx.globalAlpha = clamp(ring.alpha, 0, 1);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(ring.x, ring.y, ring.r, ring.r * 0.38, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+    });
+}
+
+function drawBallAndShadow() {
+    if (!G.ballActive || G.phase !== 'ball') return;
+
+    const b = getBallPhysics(G.ballProgress);
+
+    const shadowAlpha = clamp(0.35 * (1 - b.h / 32), 0.08, 0.45);
+    const shadowWidth = b.r * (1 + b.h * 0.04);
+    ctx.fillStyle = `rgba(0,0,0,${shadowAlpha})`;
+    ctx.beginPath();
+    ctx.ellipse(b.x, b.groundY, shadowWidth, shadowWidth * 0.32, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    const ballGrad = ctx.createRadialGradient(b.x - b.r * 0.3, b.y - b.r * 0.3, 0, b.x, b.y, b.r);
+    ballGrad.addColorStop(0, '#ff4d5a');
+    ballGrad.addColorStop(0.65, '#c70a1a');
+    ballGrad.addColorStop(1, '#6b0008');
+    ctx.fillStyle = ballGrad;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = Math.max(0.8, b.r * 0.16);
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r * 0.85, -0.6, 0.6);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.beginPath();
+    ctx.ellipse(b.x - b.r * 0.35, b.y - b.r * 0.35, b.r * 0.3, b.r * 0.2, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+
+/* ==========================================================================
+   11. TIMING METER COMPONENT (Red -> Amber -> Green -> Yellow -> Red)
+   ========================================================================== */
+
+function drawTimingMeter() {
+    const mx = W / 2 - 110;
+    const my = H * 0.915;
+    const mw = 220;
+    const mh = 14;
+
+    ctx.save();
+
+    // 1. Meter Outer Container Box
+    ctx.fillStyle = 'rgba(2, 10, 24, 0.88)';
+    roundRect(mx - 8, my - 22, mw + 16, mh + 34, 10);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0, 210, 255, 0.32)';
+    ctx.lineWidth = 1.2;
+    roundRect(mx - 8, my - 22, mw + 16, mh + 34, 10);
+    ctx.stroke();
+
+    // 2. Meter Title
+    ctx.font = 'bold 9.5px "Segoe UI",Arial,sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText('TIMING METER', mx, my - 10);
+
+    // 3. Dynamic Timing Feedback Status
+    ctx.textAlign = 'right';
+    if (G.timingResult) {
+        ctx.fillStyle = G.timingResult.color;
+        ctx.font = 'bold 11px "Segoe UI",Arial,sans-serif';
+        ctx.fillText(`${G.timingResult.label}  ${G.timingResult.sub ? '(' + G.timingResult.sub + ')' : ''}`, mx + mw, my - 10);
+    } else if (G.phase === 'ball') {
+        const pulse = (Math.sin(performance.now() / 90) + 1) * 0.5;
+        ctx.fillStyle = `rgba(0,229,255,${0.6 + pulse * 0.4})`;
+        ctx.font = 'bold 10px "Segoe UI",Arial,sans-serif';
+        ctx.fillText('AWAITING SHOT...', mx + mw, my - 10);
+    } else {
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.fillText('READY', mx + mw, my - 10);
+    }
+
+    // 4. Color Spectrum Bar: Red -> Amber -> Green -> Yellow -> Red
+    const grad = ctx.createLinearGradient(mx, 0, mx + mw, 0);
+    grad.addColorStop(0, '#ef4444');    // Far Left: Poor / Out (Too early)
+    grad.addColorStop(0.22, '#ef4444'); // Red zone
+    grad.addColorStop(0.32, '#f59e0b'); // Amber / Orange (Early shot)
+    grad.addColorStop(0.42, '#10b981'); // Emerald Green (Best timing)
+    grad.addColorStop(0.58, '#10b981'); // Green Sweet spot center
+    grad.addColorStop(0.68, '#eab308'); // Yellow (Late shot)
+    grad.addColorStop(0.78, '#ef4444'); // Red zone
+    grad.addColorStop(1, '#ef4444');    // Far Right: Poor / Out (Too late)
+
+    ctx.fillStyle = grad;
+    roundRect(mx, my, mw, mh, 6);
+    ctx.fill();
+
+    // 5. Zone Partition Line Guides
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(mx + mw * 0.40, my); ctx.lineTo(mx + mw * 0.40, my + mh);
+    ctx.moveTo(mx + mw * 0.60, my); ctx.lineTo(mx + mw * 0.60, my + mh);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(mx + mw * 0.50, my - 1);
+    ctx.lineTo(mx + mw * 0.50, my + mh + 1);
+    ctx.stroke();
+
+    ctx.font = 'bold 8px "Segoe UI",Arial,sans-serif';
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#f87171';
+    ctx.fillText('POOR', mx, my + mh + 3);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillText('EARLY', mx + mw * 0.31, my + mh + 3);
+
+    ctx.fillStyle = '#34d399';
+    ctx.fillText('BEST', mx + mw * 0.50, my + mh + 3);
+
+    ctx.fillStyle = '#facc15';
+    ctx.fillText('LATE', mx + mw * 0.69, my + mh + 3);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#f87171';
+    ctx.fillText('POOR', mx + mw, my + mh + 3);
+
+    // 6. Active Shot Timing Needle
+    if (G.timingMarkerPos !== null) {
+        const markerX = clamp(mx + mw * 0.50 + (G.timingMarkerPos * (mw * 0.50)), mx + 2, mx + mw - 2);
+        const markerColor = G.timingResult ? G.timingResult.color : '#ffffff';
+
+        ctx.fillStyle = markerColor;
+        ctx.shadowColor = markerColor;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.moveTo(markerX, my - 1);
+        ctx.lineTo(markerX - 5, my - 7);
+        ctx.lineTo(markerX + 5, my - 7);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(markerX, my - 1);
+        ctx.lineTo(markerX, my + mh + 1);
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
+    }
+
+    ctx.restore();
+}
+
+/* ==========================================================================
+   12. PARTICLES & EFFECTS
+   ========================================================================== */
+
+function spawnParticles(px, py, count, col) {
+    for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 90 + Math.random() * 220;
+        G.particles.push({
+            x: px, y: py,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 70,
+            life: 0.65 + Math.random() * 0.5,
+            maxLife: 0.65 + Math.random() * 0.5,
+            r: 2.5 + Math.random() * 3.5,
+            color: col || (Math.random() < 0.5 ? '#FFD700' : '#00E5FF'),
+        });
+    }
+}
+
+function updateParticles(dt) {
+    for (let i = G.particles.length - 1; i >= 0; i--) {
+        const p = G.particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 220 * dt;
+        p.life -= dt;
+        if (p.life <= 0) G.particles.splice(i, 1);
+    }
+}
+
+function drawParticles() {
+    G.particles.forEach(p => {
+        const alpha = clamp(p.life / p.maxLife, 0, 1);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * alpha, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+}
+
+/* ==========================================================================
+   13. PERSISTENT IN-GAME HUD
+   ========================================================================== */
+
+function fmtOvers(b) {
+    return Math.floor(b / 6) + '.' + (b % 6);
+}
+
+function drawHUD() {
+    ctx.fillStyle = 'rgba(2,10,24,0.85)';
+    roundRect(10, 8, W - 20, 54, 12); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,210,255,0.3)'; ctx.lineWidth = 1.2;
+    roundRect(10, 8, W - 20, 54, 12); ctx.stroke();
+
+    ctx.textBaseline = 'middle';
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 24px "Segoe UI",Arial,sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${G.runs}/${G.wickets}`, 22, 26);
+
+    const maxOvers = ((G.maxBalls || 12) / 6).toFixed(1);
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    ctx.font = '13px "Segoe UI",Arial,sans-serif';
+    ctx.fillText(`Overs: ${fmtOvers(G.balls)} / ${maxOvers}`, 22, 47);
+
+    if (G.isSuperOver) {
+        ctx.fillStyle = '#ffd700';
+        ctx.font = 'bold 11px "Segoe UI",Arial,sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚡ SUPER OVER', W / 2, 16);
+    }
+
+    const need = Math.max(0, G.target - G.runs);
+    const remBalls = Math.max(0, (G.maxBalls || 12) - G.balls);
+    ctx.fillStyle = '#00e5ff';
+    ctx.font = 'bold 15px "Segoe UI",Arial,sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`Target: ${G.target}`, W - 22, 24);
+
+    ctx.fillStyle = need === 0 ? '#00e676' : 'rgba(255,255,255,0.6)';
+    ctx.font = '12px "Segoe UI",Arial,sans-serif';
+    const sub = need === 0 ? 'Target achieved!' : `Need ${need} from ${remBalls} ball${remBalls !== 1 ? 's' : ''}`;
+    ctx.fillText(sub, W - 22, 46);
+
+    const pCol = G.playerTeam ? G.playerTeam.primary : '#0066cc';
+    const oCol = G.opponentTeam ? G.opponentTeam.primary : '#ffcd00';
+
+    ctx.fillStyle = pCol;
+    ctx.beginPath(); ctx.arc(135, 20, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 10px Arial'; ctx.textAlign = 'left';
+    ctx.fillText(G.playerTeam ? G.playerTeam.code : 'IND', 146, 21);
+
+    ctx.fillStyle = oCol;
+    ctx.beginPath(); ctx.arc(135, 45, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = 'bold 10px Arial';
+    ctx.fillText(`vs ${G.opponentTeam ? G.opponentTeam.code : 'AUS'} (${G.opponentTeam ? G.opponentTeam.rating : 95})`, 146, 46);
+
+    const maxW = G.maxWickets || 3;
+    for (let i = 0; i < maxW; i++) {
+        const wx = W / 2 + (maxW === 2 ? 50 : 42) + i * 16, wy = 34;
+        const isLost = i < G.wickets;
+        ctx.strokeStyle = isLost ? '#ef4444' : 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(wx - 3, wy - 7); ctx.lineTo(wx - 3, wy + 7);
+        ctx.moveTo(wx, wy - 7);     ctx.lineTo(wx, wy + 7);
+        ctx.moveTo(wx + 3, wy - 7); ctx.lineTo(wx + 3, wy + 7);
+        ctx.stroke();
+    }
+}
+
+/* ==========================================================================
+   14. RESULT OVERLAY
+   ========================================================================== */
+
+function drawResultOverlay() {
+    if (!G.lastResult) return;
+    const r = G.lastResult;
+    let textColor = '#ffffff', fontSize = 42;
+    if (r.type === 'six')    { textColor = '#FFD700'; fontSize = 54; }
+    if (r.type === 'four')   { textColor = '#00E5FF'; fontSize = 48; }
+    if (r.type === 'caught' || r.type === 'bowled') { textColor = '#FF4444'; fontSize = 46; }
+    if (r.type === 'dot' || r.type === 'miss')      { textColor = 'rgba(255,255,255,0.6)'; fontSize = 34; }
+
+    const y = H * 0.44;
+    ctx.save();
+    const scale = 1 + (1 - clamp(G.resultTimer / 0.35, 0, 1)) * 0.35;
+    ctx.translate(W / 2, y);
+    ctx.scale(scale, scale);
+
+    ctx.fillStyle = textColor;
+    ctx.font = `bold ${fontSize}px "Segoe UI",Arial,sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = textColor;
+    ctx.shadowBlur = 18;
+    ctx.fillText(r.text, 0, 0);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+    if (r.type === 'runs') {
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.font = 'bold 18px "Segoe UI",Arial,sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${r.runs} ${r.runs === 1 ? 'RUN' : 'RUNS'} COMPLETED`, W / 2, y + 36);
+    }
+
+    if (G.commentary) {
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.font = 'italic 14px "Segoe UI",Arial,sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(G.commentary, W / 2, y + 62);
+    }
+}
+
+/* ==========================================================================
+   15. MENU & TEAM SELECT SCREENS
+   ========================================================================== */
+
+function drawOverlayBg() {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#061022');
+    g.addColorStop(0.45, '#0b1b38');
+    g.addColorStop(1, '#061022');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+
+function drawMenuScreen() {
+    drawOverlayBg();
+
+    ctx.save(); ctx.translate(W / 2, H * 0.22);
+    const rad = ctx.createRadialGradient(-10, -10, 0, 0, 0, 42);
+    rad.addColorStop(0, '#ff4d5a'); rad.addColorStop(0.7, '#c70a1a'); rad.addColorStop(1, '#660007');
+    ctx.fillStyle = rad;
+    ctx.beginPath(); ctx.arc(0, 0, 42, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(0, 0, 36, -0.6, 0.6); ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 46px "Segoe UI",Arial,sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('CRICKET', W / 2, H * 0.35);
+
+    ctx.fillStyle = '#00d2ff'; ctx.font = 'bold 22px "Segoe UI",Arial,sans-serif';
+    ctx.fillText('CHAMPIONSHIP', W / 2, H * 0.405);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = '13px "Segoe UI",Arial,sans-serif';
+    ctx.fillText('Arcade Edition  ·  Team Strengths & Timing Meter', W / 2, H * 0.445);
+
+    drawAllBtns();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = '11px "Segoe UI",Arial,sans-serif';
+    ctx.fillText('Watch the Timing Meter  ·  Green = Best Boundary', W / 2, H * 0.94);
+}
+
+function drawTeamSelectScreen() {
+    drawOverlayBg();
+    const isOpp = G.screen === 'opponentSelect';
+    const title = isOpp ? 'CHOOSE OPPONENT' : 'CHOOSE YOUR COUNTRY';
+
+    ctx.fillStyle = '#00d2ff'; ctx.font = 'bold 12px "Segoe UI",Arial,sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(G.mode === 'tournament' ? 'TOURNAMENT MODE' : 'QUICK MATCH MODE', W / 2, 38);
+
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 24px "Segoe UI",Arial,sans-serif';
+    ctx.fillText(title, W / 2, 68);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = '12px "Segoe UI",Arial,sans-serif';
+    if (isOpp && G.playerTeam) {
+        ctx.fillText(`Your Team: ${G.playerTeam.name} (${G.playerTeam.rating} OVR)`, W / 2, 94);
+    } else {
+        ctx.fillText('Elite teams set higher targets & bowl with greater pace', W / 2, 94);
+    }
+
+    drawAllBtns();
+}
+
+function drawMatchIntroScreen() {
+    drawOverlayBg();
+    let roundName;
+    if (G.isSuperOver) {
+        roundName = '⚡ 1-OVER SUPER OVER CHASE ⚡';
+    } else {
+        roundName = G.mode === 'tournament' ? DIFF[G.difficulty].name.toUpperCase() : 'QUICK MATCH CHASE';
+    }
+    ctx.fillStyle = G.isSuperOver ? '#ffd700' : '#00d2ff';
+    ctx.font = 'bold 14px "Segoe UI",Arial,sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(roundName, W / 2, 54);
+
+    const pt = G.playerTeam || TEAMS[0], ot = G.opponentTeam || TEAMS[1];
+    const vy = 150;
+
+    // Player Team Badge & Rating
+    ctx.fillStyle = pt.primary;
+    ctx.beginPath(); ctx.arc(W / 2 - 85, vy, 30, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 15px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(pt.code, W / 2 - 85, vy);
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 14px "Segoe UI",Arial,sans-serif';
+    ctx.fillText(pt.name, W / 2 - 85, vy + 46);
+    ctx.fillStyle = '#ffd700'; ctx.font = 'bold 11px "Segoe UI",Arial,sans-serif';
+    ctx.fillText(`${pt.stars} ${pt.rating} OVR`, W / 2 - 85, vy + 64);
+
+    // VS
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.font = 'bold 20px "Segoe UI",Arial,sans-serif';
+    ctx.fillText('VS', W / 2, vy);
+
+    // Opponent Team Badge & Rating
+    ctx.fillStyle = ot.primary;
+    ctx.beginPath(); ctx.arc(W / 2 + 85, vy, 30, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 15px Arial'; ctx.textAlign = 'center';
+    ctx.fillText(ot.code, W / 2 + 85, vy);
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 14px "Segoe UI",Arial,sans-serif';
+    ctx.fillText(ot.name, W / 2 + 85, vy + 46);
+    ctx.fillStyle = '#ffd700'; ctx.font = 'bold 11px "Segoe UI",Arial,sans-serif';
+    ctx.fillText(`${ot.stars} ${ot.rating} OVR`, W / 2 + 85, vy + 64);
+
+    // Target Presentation
+    ctx.fillStyle = '#FFD700'; ctx.font = 'bold 48px "Segoe UI",Arial,sans-serif';
+    ctx.fillText(`${G.target}`, W / 2, 282);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = 'bold 16px "Segoe UI",Arial,sans-serif';
+    ctx.fillText('RUNS TO CHASE', W / 2, 318);
+
+    const ballsInfo = G.isSuperOver 
+        ? '6 Balls  ·  1 Over (Super Over)  ·  2 Wickets Max'
+        : '12 Balls  ·  2 Overs  ·  3 Wickets Max';
+    ctx.fillStyle = G.isSuperOver ? '#ffd700' : 'rgba(255,255,255,0.45)';
+    ctx.font = G.isSuperOver ? 'bold 12px "Segoe UI",Arial,sans-serif' : '13px "Segoe UI",Arial,sans-serif';
+    ctx.fillText(ballsInfo, W / 2, 346);
+
+
+
+    drawAllBtns();
+}
+
+function drawMatchResultScreen() {
+    drawOverlayBg();
+    const isTie = G.matchResult === 'tie';
+    const won = G.matchResult === 'win';
+    ctx.fillStyle = isTie ? 'rgba(255,215,0,0.1)' : (won ? 'rgba(0,210,120,0.08)' : 'rgba(220,0,0,0.08)');
+    ctx.fillRect(0, 0, W, H);
+
+    const isFinalWin = won && G.mode === 'tournament' && G.round >= 2;
+
+    if (isFinalWin) {
+        ctx.fillStyle = '#FFD700'; ctx.font = '48px serif'; ctx.textAlign = 'center';
+        ctx.fillText('🏆', W / 2, 68);
+    }
+
+    let headline, subline;
+    if (isTie) {
+        headline = 'MATCH TIED!';
+        subline = `Scores level at ${G.runs}! Heading to the Super Over!`;
+    } else if (won) {
+        if (isFinalWin) {
+            headline = G.isSuperOver ? 'SUPER OVER CHAMPIONS!' : 'WORLD CHAMPIONS!';
+            subline = 'You conquered the Grand Final!';
+        } else {
+            headline = G.isSuperOver ? 'SUPER OVER VICTORY!' : 'VICTORY!';
+            subline = 'Target successfully chased down!';
+        }
+    } else {
+        headline = G.isSuperOver ? 'SUPER OVER DEFEAT!' : 'DEFEAT!';
+        subline = G.wickets >= (G.maxWickets || 3) ? `All ${G.maxWickets || 3} wickets lost!` : 'Ran out of balls before target.';
+    }
+
+    ctx.fillStyle = isTie ? '#ffd700' : (won ? '#00e5ff' : '#ff4444');
+    ctx.font = 'bold 34px "Segoe UI",Arial,sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(headline, W / 2, isFinalWin ? 112 : 95);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '13px "Segoe UI",Arial,sans-serif';
+    ctx.fillText(subline, W / 2, isFinalWin ? 138 : 122);
+
+    // 1. MATCH STATS CARD
+    const cardY = isFinalWin ? 155 : 140;
+    const cardH = 88;
+    ctx.fillStyle = 'rgba(2, 12, 28, 0.78)';
+    roundRect(24, cardY, W - 48, cardH, 14); ctx.fill();
+    ctx.strokeStyle = won ? 'rgba(0, 210, 255, 0.35)' : 'rgba(255, 68, 68, 0.35)';
+    ctx.lineWidth = 1.2;
+    roundRect(24, cardY, W - 48, cardH, 14); ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 28px "Segoe UI",Arial,sans-serif';
+    ctx.fillText(`${G.runs}/${G.wickets}`, W / 2, cardY + 32);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '12px "Segoe UI",Arial,sans-serif';
+    ctx.fillText(`from ${fmtOvers(G.balls)} overs  (Target: ${G.target})`, W / 2, cardY + 54);
+
+    ctx.fillStyle = '#00d2ff'; ctx.font = 'bold 12px "Segoe UI",Arial,sans-serif';
+    ctx.fillText(`4s: ${G.fours}   •   6s: ${G.sixes}   •   Dots: ${G.dots}`, W / 2, cardY + 75);
+
+    // 2. XP REWARDS BREAKDOWN CARD
+    const xpY = cardY + cardH + 12;
+    const xpH = won ? 168 : 88;
+    ctx.fillStyle = won ? 'rgba(0, 26, 52, 0.88)' : 'rgba(24, 8, 14, 0.82)';
+    roundRect(24, xpY, W - 48, xpH, 14); ctx.fill();
+    ctx.strokeStyle = won ? 'rgba(0, 210, 255, 0.5)' : 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = 1.2;
+    roundRect(24, xpY, W - 48, xpH, 14); ctx.stroke();
+
+    const xp = G.xpSummary || { won: false, totalXp: 0 };
+    if (won) {
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#ffd700'; ctx.font = 'bold 13px "Segoe UI",Arial,sans-serif';
+        ctx.fillText('⚡ XP REWARDS BREAKDOWN', 42, xpY + 25);
+
+
+
+        ctx.font = '12px "Segoe UI",Arial,sans-serif';
+        const row1Y = xpY + 52;
+        ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.fillText(xp.label || 'Base Win XP', 42, row1Y);
+        ctx.textAlign = 'right'; ctx.fillStyle = '#ffffff';
+        ctx.fillText(`+${xp.baseXp} XP`, W - 42, row1Y);
+
+        const row2Y = xpY + 75;
+        ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.fillText(`Sixes Bonus (${xp.sixesCount} hit × 6 XP)`, 42, row2Y);
+        ctx.textAlign = 'right'; ctx.fillStyle = '#00d2ff';
+        ctx.fillText(`+${xp.sixesBonus} XP`, W - 42, row2Y);
+
+        const row3Y = xpY + 98;
+        ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.fillText(`Wickets in Hand (${xp.wicketsInHand} remain × 10 XP)`, 42, row3Y);
+        ctx.textAlign = 'right'; ctx.fillStyle = '#00d2ff';
+        ctx.fillText(`+${xp.wicketsBonus} XP`, W - 42, row3Y);
+
+        // Divider
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(42, xpY + 115); ctx.lineTo(W - 42, xpY + 115);
+        ctx.stroke();
+
+        // Total
+        const row4Y = xpY + 142;
+        ctx.textAlign = 'left'; ctx.fillStyle = '#ffffff'; ctx.font = 'bold 13px "Segoe UI",Arial,sans-serif';
+        ctx.fillText('TOTAL MATCH XP', 42, row4Y);
+        ctx.textAlign = 'right'; ctx.fillStyle = '#00ffc2'; ctx.font = 'bold 18px "Segoe UI",Arial,sans-serif';
+        ctx.fillText(`+${xp.totalXp} XP`, W - 42, row4Y);
+    } else {
+        if (isTie) {
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#ffd700'; ctx.font = 'bold 16px "Segoe UI",Arial,sans-serif';
+            ctx.fillText('⚡ 1-OVER SUPER OVER DECIDER', W / 2, xpY + 38);
+
+            ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font = '13px "Segoe UI",Arial,sans-serif';
+            ctx.fillText('1 Over (6 balls)  ·  2 Wickets', W / 2, xpY + 62);
+        } else {
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#ff6b6b'; ctx.font = 'bold 14px "Segoe UI",Arial,sans-serif';
+            ctx.fillText('MATCH XP EARNED: 0 XP', W / 2, xpY + 34);
+
+            ctx.fillStyle = 'rgba(255,255,255,0.65)'; ctx.font = '12px "Segoe UI",Arial,sans-serif';
+            ctx.fillText('Target was not chased down. No XP awarded.', W / 2, xpY + 56);
+            ctx.fillText('Win with wickets in hand & hit 6s for maximum bonus XP!', W / 2, xpY + 74);
+        }
+    }
+
+    drawAllBtns();
+}
+
+/* ==========================================================================
+   16. ACTIVE GAMEPLAY DRAWING
+   ========================================================================== */
+
+function drawGameplay() {
+    drawSkyAndStadium();
+    drawOutfield();
+    drawPitch();
+
+    // Stumps at Bowler's End
+    drawStumps(false);
+
+    // Bowler at Bowler's End
+    drawBowler();
+
+    // All 10 Fielders strictly on the Green Grass (ZERO on the pitch!)
+    drawAllFielders();
+
+    // Pitch Landing Marker (Clear bounce location)
+    drawPitchLandingMarker();
+    drawPitchRings();
+
+    // Near Stumps (drawn BEHIND batsman at botY + 8)
+    drawStumps(true);
+
+    // Athletic Batsman standing IN FRONT of the stumps on the popping crease!
+    drawBatsman();
+
+    // Ball & Shadow
+    drawBallAndShadow();
+
+    if (G.phase === 'shotAnim' && G.lastResult) {
+        const t = clamp(G.shotAnimProg, 0, 1);
+        const startX = W / 2 - 10;
+        const startY = PITCH_GEOM.botY - 24;
+        const curX = lerp(startX, G.shotTargetX, t);
+        const curY = lerp(startY, G.shotTargetY, t);
+        const arcY = Math.sin(t * Math.PI) * (G.lastResult.type === 'six' ? 140 : 35);
+        const ballSize = lerp(9, G.lastResult.type === 'six' ? 4 : 5.5, t);
+
+        ctx.fillStyle = '#cc1122';
+        ctx.beginPath();
+        ctx.arc(curX, curY - arcY, ballSize, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    drawParticles();
+
+    // Clean Timing Meter at bottom
+    drawTimingMeter();
+
+    drawResultOverlay();
+    drawHUD();
+
+    if (G.firstBall && G.phase === 'ball' && G.ballProgress > 0.15 && G.ballProgress < 0.65) {
+        const pulse = Math.sin(performance.now() / 110) * 0.25 + 0.75;
+        ctx.fillStyle = `rgba(0,229,255,${pulse * 0.8})`;
+        ctx.font = 'bold 16px "Segoe UI",Arial,sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('TAP ANYWHERE TO BAT!', W / 2, H * 0.73);
+    }
+}
+
+/* ==========================================================================
+   17. GAMEPLAY ENGINE & BALL LOGIC
+   ========================================================================== */
+
+function setupMatch() {
+    G.isSuperOver = false;
+    G.maxBalls = 12;
+    G.maxWickets = 3;
+    if (G.mode === 'tournament') {
+        G.difficulty = G.round;
+        G.opponentTeam = G.tournamentOpponents[G.round];
+    } else {
+        G.difficulty = 1;
+    }
+    G.target = calculateTarget(G.playerTeam, G.opponentTeam, G.mode, G.round);
+    resetInnings();
+}
+
+/**
+ * Super Over Setup:
+ * - Triggered when match ends in a Tie/Draw (e.g. 50 runs scored chasing 51).
+ * - 1 Over (6 balls) with 2 wickets in hand.
+ * - Difficulty raised by 1 notch (more pace & aggressive swing).
+ * - Target between 14 and 25 runs (always strictly less than 30 runs).
+ */
+function setupSuperOver() {
+    G.isSuperOver = true;
+    G.maxBalls = 6;
+    G.maxWickets = 2;
+    G.difficulty = Math.min(2, G.difficulty + 1);
+
+    const oppMod = G.opponentTeam ? Math.round((G.opponentTeam.targetMod || 0) * 0.4) : 0;
+    const baseTarget = randInt(16, 22);
+    G.target = clamp(baseTarget + oppMod, 14, 26);
+
+    resetInnings();
+    setScreen('matchIntro');
+}
+
+function setupTournament() {
+    G.round = 0;
+    const avail = TEAMS.filter(t => t !== G.playerTeam);
+    shuffle(avail);
+    G.tournamentOpponents = avail.slice(0, 3);
+    setupMatch();
+}
+
+function startPlaying() {
+    setScreen('playing');
+    G.phase = 'wait';
+    G.waitTimer = 0.55;
+}
+
+function startNewBall() {
+    G.phase = 'bowling';
+    G.bowlerAnim = 0;
+    G.hasSwung = false;
+    G.missTimer = 0;
+    G.swingPhase = 0;
+    G.swinging = false;
+    G.resultProcessed = false;
+    G.hasBounced = false;
+    G.ballActive = false;
+    G.lastResult = null;
+    G.commentary = '';
+    G.timingResult = null;
+    G.timingMarkerPos = null;
+
+    const d = DIFF[G.difficulty];
+    const opp = G.opponentTeam || TEAMS[1];
+    const speedMod = opp.speedMod || 0;
+    const swingMod = opp.swingMod || 0;
+
+    G.ballLine = (Math.random() - 0.5) * (0.55 + G.difficulty * 0.18);
+    G.ballSwing = (Math.random() - 0.5) * (d.swing + swingMod);
+    G.ballSpeed = d.speed + speedMod + (Math.random() - 0.5) * 0.08;
+
+    const lenRoll = Math.random();
+    if (lenRoll < 0.65) {
+        G.ballLength = 'good';
+        G.pitchPt = 0.52;
+    } else if (lenRoll < 0.85) {
+        G.ballLength = 'full';
+        G.pitchPt = 0.64;
+    } else {
+        G.ballLength = 'short';
+        G.pitchPt = 0.40;
+    }
+}
+
+function releaseBall() {
+    G.phase = 'ball';
+    G.ballProgress = 0;
+    G.ballActive = true;
+    G.deliveryStart = performance.now();
+    G.idealSwingTime = G.deliveryStart + (0.88 / G.ballSpeed) * 1000;
+}
+
+function swing() {
+    if (G.hasSwung || G.phase !== 'ball') return;
+    G.hasSwung = true;
+    G.swinging = true;
+    G.swingPhase = 0;
+    G.swingTime = performance.now();
+    G.firstBall = false;
+    ensureAudio();
+    sfxClick();
+}
+
+function isBallOnStumps() {
+    const totalLine = G.ballLine + G.ballSwing / 45;
+    return Math.abs(totalLine) < 0.20;
+}
+
+function processBallResult() {
+    G.balls++;
+    let result;
+
+    if (G.hasSwung) {
+        const delta = G.swingTime - G.idealSwingTime;
+        const absDelta = Math.abs(delta);
+
+        G.timingMarkerPos = clamp(delta / 200, -1, 1);
+
+        if (absDelta < TIMING.PERFECT) {
+            const isSix = Math.random() < 0.50;
+            const runs = isSix ? 6 : 4;
+            result = { type: isSix ? 'six' : 'four', runs, text: isSix ? 'SIX!' : 'FOUR!', wicket: false };
+            sfxHit(); sfxCheer();
+            G.shakeAmount = isSix ? 15 : 9;
+            spawnParticles(W / 2 - 10, PITCH_GEOM.botY - 20, isSix ? 38 : 22);
+
+            G.shotTargetX = W / 2 + (Math.random() - 0.5) * 260;
+            G.shotTargetY = isSix ? -50 : H * 0.32;
+            G.phase = 'shotAnim'; G.shotAnimProg = 0;
+
+            G.timingResult = {
+                label: 'BEST TIMING',
+                sub: `${delta >= 0 ? '+' : ''}${Math.round(delta)}ms`,
+                color: '#10b981'
+            };
+        } else if (absDelta < TIMING.GOOD) {
+            const runs = randInt(1, 3);
+            const isLate = delta > 0;
+            result = { type: 'runs', runs, text: `${runs} ${runs === 1 ? 'RUN' : 'RUNS'}`, wicket: false };
+            sfxHit();
+            G.shotTargetX = W / 2 + (Math.random() - 0.5) * 220;
+            G.shotTargetY = H * 0.46 + Math.random() * 80;
+            G.phase = 'shotAnim'; G.shotAnimProg = 0;
+
+            G.timingResult = {
+                label: isLate ? 'LATE SHOT' : 'EARLY SHOT',
+                sub: `${delta >= 0 ? '+' : ''}${Math.round(delta)}ms`,
+                color: isLate ? '#eab308' : '#f59e0b'
+            };
+        } else if (absDelta < TIMING.MISTIMED) {
+            const caught = Math.random() < 0.50;
+            const isLate = delta > 0;
+            if (caught) {
+                result = { type: 'caught', runs: 0, text: 'CAUGHT!', wicket: true };
+                sfxWicket();
+                G.shakeAmount = 6;
+                G.shotTargetX = W / 2 + (Math.random() - 0.5) * 190;
+                G.shotTargetY = H * 0.42;
+                G.phase = 'shotAnim'; G.shotAnimProg = 0;
+            } else {
+                result = { type: 'dot', runs: 0, text: 'DOT BALL', wicket: false };
+                G.phase = 'result'; G.resultTimer = 1.0;
+            }
+
+            G.timingResult = {
+                label: caught ? 'POOR / CAUGHT' : (isLate ? 'VERY LATE' : 'VERY EARLY'),
+                sub: `${delta >= 0 ? '+' : ''}${Math.round(delta)}ms`,
+                color: caught ? '#ef4444' : (isLate ? '#eab308' : '#f59e0b')
+            };
+        } else {
+            const isLate = delta > 0;
+            G.missTimer = 0.9;
+            if (isBallOnStumps()) {
+                result = { type: 'bowled', runs: 0, text: 'BOWLED!', wicket: true };
+                sfxWicket();
+                G.shakeAmount = 7;
+            } else {
+                result = { type: 'miss', runs: 0, text: 'MISSED!', wicket: false };
+            }
+            G.phase = 'result'; G.resultTimer = 1.25;
+
+            G.timingResult = {
+                label: isBallOnStumps() ? 'POOR (BOWLED OUT)' : (isLate ? 'TOO LATE' : 'TOO EARLY'),
+                sub: `${delta >= 0 ? '+' : ''}${Math.round(delta)}ms`,
+                color: '#ef4444'
+            };
+        }
+    } else {
+        G.timingMarkerPos = 1.0;
+        G.missTimer = 0.9;
+        if (isBallOnStumps()) {
+            result = { type: 'bowled', runs: 0, text: 'BOWLED!', wicket: true };
+            sfxWicket();
+            G.shakeAmount = 7;
+        } else {
+            result = { type: 'dot', runs: 0, text: 'BALL PASSED', wicket: false };
+        }
+        G.phase = 'result'; G.resultTimer = 1.25;
+
+        G.timingResult = {
+            label: isBallOnStumps() ? 'POOR (BOWLED OUT)' : 'NO SWING',
+            sub: 'BEATEN',
+            color: '#ef4444'
+        };
+    }
+
+    G.runs += result.runs;
+    if (result.wicket) G.wickets++;
+    if (result.type === 'six') G.sixes++;
+    if (result.type === 'four') G.fours++;
+    if (result.runs === 0 && !result.wicket) G.dots++;
+
+    G.lastResult = result;
+    G.ballActive = false;
+    G.commentary = pick(COMMENTARY[result.type] || COMMENTARY.dot);
+}
+
+function checkMatchEnd() {
+    const maxB = G.maxBalls || 12;
+    const maxW = G.maxWickets || 3;
+
+    // Win: Successfully equaled or passed target score
+    if (G.runs >= G.target) {
+        G.matchResult = 'win';
+        return true;
+    }
+
+    // Out of wickets:
+    if (G.wickets >= maxW) {
+        // If scores are level (e.g. 50 runs scored chasing 51): Match is a Tie / Draw!
+        if (G.runs === G.target - 1) {
+            G.matchResult = 'tie';
+            return true;
+        }
+        G.matchResult = 'loss';
+        return true;
+    }
+
+    // All balls bowled:
+    if (G.balls >= maxB) {
+        if (G.runs >= G.target) {
+            G.matchResult = 'win';
+            return true;
+        }
+        // If scores are level at the end of the overs: Match is a Tie / Draw!
+        if (G.runs === G.target - 1) {
+            G.matchResult = 'tie';
+            return true;
+        }
+        G.matchResult = 'loss';
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Calculate match XP based on:
+ * - Quick Match Win: 70 XP
+ * - Tournament Grand Final Win: 500 XP
+ * - Tournament QF / SF Win: 0 XP base, plus individual 6s & wicket bonuses
+ * - Loss: 0 XP
+ * - Sixes Bonus: +6 XP per six hit
+ * - Wickets Bonus: +10 XP per wicket in hand (30 for 0 lost, 20 for 1 lost, 10 for 2 lost)
+ */
+function calculateAndAwardMatchXp() {
+    const won = G.matchResult === 'win';
+    if (!won) {
+        G.xpSummary = {
+            won: false,
+            baseXp: 0,
+            sixesCount: G.sixes || 0,
+            sixesBonus: 0,
+            wicketsInHand: Math.max(0, 3 - G.wickets),
+            wicketsBonus: 0,
+            totalXp: 0,
+            awarded: false
+        };
+        return;
+    }
+
+    const sixesCount = G.sixes || 0;
+    const sixesBonus = sixesCount * 6;
+    const wicketsInHand = Math.max(0, 3 - G.wickets);
+    const wicketsBonus = wicketsInHand * 10;
+
+    let baseXp = 70;
+    let label = 'Quick Match Win';
+    if (G.mode === 'quick') {
+        baseXp = 70;
+        label = G.isSuperOver ? 'Super Over Win' : 'Quick Match Win';
+    } else if (G.mode === 'tournament') {
+        if (G.round >= 2) {
+            baseXp = 500;
+            label = G.isSuperOver ? 'Super Over World Champion' : 'Tournament Champion';
+        } else if (G.round === 0) {
+            // Client requirement: QF match win awards 70 XP base
+            baseXp = 70;
+            label = G.isSuperOver ? 'Super Over QF Win' : 'Quarter-Final Win';
+        } else if (G.round === 1) {
+            // Client requirement: SF match win awards 70 XP base
+            baseXp = 70;
+            label = G.isSuperOver ? 'Super Over SF Win' : 'Semi-Final Win';
+        }
+    }
+
+    const totalXp = baseXp + sixesBonus + wicketsBonus;
+    G.xpSummary = {
+        won: true,
+        label,
+        baseXp,
+        sixesCount,
+        sixesBonus,
+        wicketsInHand,
+        wicketsBonus,
+        totalXp,
+        awarded: false
+    };
+
+    if (totalXp > 0) {
+        awardCricketXp(totalXp);
+    }
+}
+
+async function awardCricketXp(amount) {
+    if (!amount || amount <= 0) return;
+    try {
+        if (window.GamingSession?.ready) await window.GamingSession.ready;
+        const origin = window.GamingSession?.apiOrigin || '';
+        const res = await window.GamingSession.fetch(`${origin}/api/v1/games/cricket/award-xp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ xpEarned: amount })
+        });
+        if (res.ok) {
+            const body = await res.json();
+            const total = body?.data?.totalXp;
+            if (typeof total === 'number') {
+                if (!currentUser) currentUser = {};
+                currentUser.xp = total;
+                if (G.xpSummary) G.xpSummary.awarded = true;
+            }
+        }
+    } catch (err) {
+        console.warn('Could not sync cricket XP to backend:', err);
+    }
+}
+
+function showMatchResult() {
+    setScreen('matchResult');
+    const won = G.matchResult === 'win';
+    calculateAndAwardMatchXp();
+
+    const btnW = 210, btnH = 46;
+    const btnX = W / 2 - btnW / 2;
+    const startY = won ? 440 : 365;
+
+    if (G.matchResult === 'tie') {
+        // MATCH TIED -> Play Super Over!
+        addBtn(btnX, startY, btnW, btnH, 'PLAY SUPER OVER ⚡', () => {
+            setupSuperOver();
+        });
+        addBtn(btnX, startY + 54, btnW, btnH, 'MAIN MENU', () => setScreen('menu'));
+    } else if (won) {
+        if (G.mode === 'tournament') {
+            if (G.round < 2) {
+                addBtn(btnX, startY, btnW, btnH, 'NEXT ROUND ➔', () => {
+                    G.round++;
+                    setupMatch();
+                    setScreen('matchIntro');
+                });
+            } else {
+                addBtn(btnX, startY, btnW, btnH, 'NEW TOURNAMENT 🏆', () => {
+                    G.round = 0;
+                    setScreen('teamSelect');
+                });
+            }
+        } else {
+            addBtn(btnX, startY, btnW, btnH, 'PLAY AGAIN 🔄', () => {
+                setupMatch();
+                setScreen('matchIntro');
+            });
+        }
+        addBtn(btnX, startY + 54, btnW, btnH, 'MAIN MENU', () => setScreen('menu'));
+    } else {
+        // Loss
+        if (G.mode === 'tournament') {
+            addBtn(btnX, startY, btnW, btnH, 'RETRY TOURNAMENT', () => {
+                G.round = 0;
+                setupMatch();
+                setScreen('matchIntro');
+            });
+        } else {
+            addBtn(btnX, startY, btnW, btnH, 'TRY AGAIN 🔄', () => {
+                setupMatch();
+                setScreen('matchIntro');
+            });
+        }
+        addBtn(btnX, startY + 54, btnW, btnH, 'MAIN MENU', () => setScreen('menu'));
+    }
+}
+
+/* ==========================================================================
+   18. SCREEN TRANSITIONS
+   ========================================================================== */
+
+function setScreen(name) {
+    G.screen = name;
+    clearBtns();
+    G.particles = [];
+
+    switch (name) {
+    case 'menu':
+        addBtn(W / 2 - 115, H * 0.52, 230, 52, 'QUICK MATCH', () => {
+            G.mode = 'quick';
+            setScreen('teamSelect');
+        });
+        addBtn(W / 2 - 115, H * 0.62, 230, 52, 'TOURNAMENT', () => {
+            G.mode = 'tournament';
+            setScreen('teamSelect');
+        });
+        addBtn(W / 2 - 115, H * 0.72, 230, 46, '← BACK TO HUB', () => {
+            window.location.href = './index.html';
+        });
+        break;
+
+    case 'teamSelect':
+    case 'opponentSelect': {
+        const isOpp = name === 'opponentSelect';
+        const teams = isOpp ? TEAMS.filter(t => t !== G.playerTeam) : TEAMS;
+        const startY = isOpp ? 130 : 115;
+        const colW = (W - 56) / 2, rowH = 52, gap = 8;
+        teams.forEach((t, i) => {
+            const col = i % 2, row = Math.floor(i / 2);
+            const x = 20 + col * (colW + 16), y = startY + row * (rowH + gap);
+            const sub = `${t.stars} ${t.rating} OVR`;
+            addBtn(x, y, colW, rowH, t.name, () => {
+                ensureAudio();
+                sfxClick();
+                if (isOpp) {
+                    G.opponentTeam = t;
+                    setupMatch();
+                    setScreen('matchIntro');
+                } else {
+                    G.playerTeam = t;
+                    if (G.mode === 'quick') {
+                        setScreen('opponentSelect');
+                    } else {
+                        setupTournament();
+                        setScreen('matchIntro');
+                    }
+                }
+            }, t.primary, sub);
+        });
+
+        addBtn(W / 2 - 60, H * 0.92, 120, 38, 'BACK', () => {
+            if (isOpp) setScreen('teamSelect');
+            else setScreen('menu');
+        });
+        break;
+    }
+
+    case 'matchIntro':
+        const introBtnText = G.isSuperOver ? 'PLAY SUPER OVER ⚡' : 'PLAY MATCH';
+        addBtn(W / 2 - 100, H * 0.62, 200, 52, introBtnText, () => {
+            ensureAudio();
+            startPlaying();
+        });
+        addBtn(W / 2 - 60, H * 0.72, 120, 38, 'BACK', () => setScreen('menu'));
+        break;
+
+    case 'playing':
+        break;
+
+    case 'matchResult':
+        break;
+    }
+}
+
+/* ==========================================================================
+   19. INPUT HANDLING
+   ========================================================================== */
+
+function handleInput(cx, cy) {
+    ensureAudio();
+
+    if (G.screen === 'playing') {
+        if (G.phase === 'ball' && !G.hasSwung) {
+            swing();
+        }
+        return;
+    }
+
+    if (hitBtn(cx, cy)) return;
+}
+
+canvas.addEventListener('mousedown', e => {
+    e.preventDefault();
+    const p = canvasCoords(e.clientX, e.clientY);
+    handleInput(p.x, p.y);
+});
+
+canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    const p = canvasCoords(t.clientX, t.clientY);
+    handleInput(p.x, p.y);
+}, { passive: false });
+
+/* ==========================================================================
+   20. MAIN UPDATE & RENDER LOOP
+   ========================================================================== */
+
+function update(dt) {
+    updateParticles(dt);
+    updatePitchRings(dt);
+
+    G.batTapTimer += dt;
+    if (G.missTimer > 0) G.missTimer -= dt;
+
+    if (G.shakeAmount > 0) {
+        G.shakeAmount *= Math.pow(0.04, dt);
+        if (G.shakeAmount < 0.25) G.shakeAmount = 0;
+    }
+
+    if (G.swinging) {
+        G.swingPhase += dt * 11;
+        if (G.swingPhase >= 1) {
+            G.swingPhase = 1;
+            G.swinging = false;
+        }
+    } else if (G.swingPhase > 0) {
+        G.swingPhase -= dt * 4;
+        if (G.swingPhase < 0) G.swingPhase = 0;
+    }
+
+    if (G.screen !== 'playing') return;
+
+    switch (G.phase) {
+    case 'wait':
+        G.waitTimer -= dt;
+        if (G.waitTimer <= 0) startNewBall();
+        break;
+
+    case 'bowling':
+        G.bowlerAnim += dt * 2.4;
+        if (G.bowlerAnim >= 1) releaseBall();
+        break;
+
+    case 'ball':
+        G.ballProgress += dt * G.ballSpeed;
+
+        if (!G.hasBounced && G.ballProgress >= G.pitchPt) {
+            G.hasBounced = true;
+            sfxBounce();
+            const b = getBallPhysics(G.pitchPt);
+            spawnPitchImpact(b.x, b.groundY);
+        }
+
+        if (!G.resultProcessed) {
+            if (G.hasSwung && G.ballProgress >= 0.88) {
+                G.resultProcessed = true;
+                processBallResult();
+            } else if (G.ballProgress >= 1.05) {
+                G.resultProcessed = true;
+                processBallResult();
+            }
+        }
+        break;
+
+    case 'shotAnim':
+        G.shotAnimProg += dt * 2.1;
+        if (G.shotAnimProg >= 1) {
+            G.phase = 'result';
+            G.resultTimer = 1.35;
+        }
+        break;
+
+    case 'result':
+        G.resultTimer -= dt;
+        if (G.resultTimer <= 0) {
+            if (checkMatchEnd()) {
+                showMatchResult();
+            } else {
+                G.phase = 'wait';
+                G.waitTimer = 0.65;
+            }
+        }
+        break;
+    }
+}
+
+function render() {
+    ctx.save();
+    if (G.shakeAmount > 0) {
+        ctx.translate((Math.random() - 0.5) * G.shakeAmount * 2, (Math.random() - 0.5) * G.shakeAmount * 2);
+    }
+    ctx.fillStyle = '#030914';
+    ctx.fillRect(-10, -10, W + 20, H + 20);
+
+    switch (G.screen) {
+    case 'menu':           drawMenuScreen(); break;
+    case 'teamSelect':
+    case 'opponentSelect': drawTeamSelectScreen(); break;
+    case 'matchIntro':     drawMatchIntroScreen(); break;
+    case 'playing':        drawGameplay(); break;
+    case 'matchResult':    drawMatchResultScreen(); break;
+    }
+    ctx.restore();
+}
+
+let lastTime = 0;
+function gameLoop(ts) {
+    const dt = Math.min((ts - lastTime) / 1000, 0.05);
+    lastTime = ts;
+    update(dt);
+    render();
+    requestAnimationFrame(gameLoop);
+}
+
+setScreen('menu');
+requestAnimationFrame(gameLoop);
+
+/* ==========================================================================
+   20. USER SESSION, NAVIGATION & IDENTITY MANAGEMENT
+   ========================================================================== */
+
+let currentUser = null;
+const playerNameEl = document.getElementById('cricket-player-name');
+const playerStatusEl = document.getElementById('cricket-player-status');
+
+function updateNavUser(user) {
+    currentUser = user || null;
+    if (user && user.username) {
+        if (playerNameEl) playerNameEl.textContent = `@${user.username}`;
+        if (playerStatusEl) playerStatusEl.classList.add('is-active');
+    } else {
+        if (playerNameEl) playerNameEl.textContent = 'GUEST';
+        if (playerStatusEl) playerStatusEl.classList.remove('is-active');
+    }
+}
+
+async function refreshUserSession() {
+    try {
+        if (window.GamingSession?.ready) await window.GamingSession.ready;
+        const origin = window.GamingSession?.apiOrigin || '';
+        const res = await window.GamingSession.fetch(`${origin}/api/v1/users/me`);
+        if (res.ok) {
+            const body = await res.json();
+            const user = body.data?.user || body.data;
+            updateNavUser(user);
+        } else {
+            updateNavUser(null);
+        }
+    } catch (_err) {
+        updateNavUser(null);
+    }
+}
+refreshUserSession();
+
+/* Global Game Search Bar */
+(() => {
+    const searchInput = document.getElementById('game-search');
+    const searchResults = document.getElementById('game-search-results');
+    if (!searchInput || !searchResults) return;
+
+    const catalog = [
+        { id: '001', title: 'Tic Tac Toe', type: 'STRATEGY', url: 'game.html?game=tic-tac-toe' },
+        { id: '002', title: 'Word Bomb', type: 'WORD ARENA', url: 'word-bomb.html' },
+        { id: '003', title: 'Timeline', type: 'DAILY', url: 'timeline.html' },
+        { id: '004', title: 'Mystery Country', type: 'GEOGRAPHY', url: 'mystery-country.html' },
+        { id: '005', title: 'Estimate It', type: 'ESTIMATION', url: 'estimate-it.html' },
+        { id: '006', title: 'Mini Olympics', type: 'SPORTS', url: 'mini-olympics.html' },
+        { id: '007', title: 'Clever Chaos', type: 'PUZZLE', url: 'puzzle-quest.html' },
+        { id: '008', title: 'Cricket Arcade', type: 'SPORTS RUN CHASE', url: 'cricket.html' }
+    ];
+
+    searchInput.addEventListener('input', () => {
+        const query = searchInput.value.trim().toLowerCase();
+        if (!query) {
+            searchResults.hidden = true;
+            searchResults.innerHTML = '';
+            return;
+        }
+        const matches = catalog.filter(g => g.title.toLowerCase().includes(query) || g.type.toLowerCase().includes(query));
+        if (matches.length === 0) {
+            searchResults.innerHTML = '<p class="search-empty">NO MATCHING GAMES</p>';
+        } else {
+            searchResults.innerHTML = matches.map(g => `
+                <a href="./${g.url}">
+                    <span>${g.id}</span>
+                    <strong>${g.title}</strong>
+                    <small>${g.type}</small>
+                </a>
+            `).join('');
+        }
+        searchResults.hidden = false;
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.hidden = true;
+        }
+    });
+})();
+
+/* Liquid Glass Navigation Mouse Glow */
+(() => {
+    const nav = document.querySelector('.main-navigation');
+    if (!nav) return;
+    nav.addEventListener('mousemove', (e) => {
+        const r = nav.getBoundingClientRect();
+        if (r.width && r.height) {
+            nav.style.setProperty('--mouse-x', `${((e.clientX - r.left) / r.width) * 100}%`);
+            nav.style.setProperty('--mouse-y', `${((e.clientY - r.top) / r.height) * 100}%`);
+        }
+    });
+    nav.addEventListener('mouseleave', () => {
+        nav.style.setProperty('--mouse-x', '50%');
+        nav.style.setProperty('--mouse-y', '50%');
+    });
+})();
+
+/* Auth Modal Controller */
+(() => {
+    const overlay = document.getElementById('auth-overlay');
+    const authView = document.getElementById('auth-view');
+    const authMessage = document.getElementById('auth-message');
+    const authTitle = document.getElementById('auth-title');
+    const navEl = document.getElementById('auth-navigation');
+    const playerBtn = document.getElementById('player-menu-button');
+    const closeBtn = document.getElementById('auth-close-button');
+
+    let authStep = 'login';
+    let authContext = {};
+    let authBusy = false;
+    let resendTimer = null;
+    let usernameTimer = null;
+    let availableUsername = null;
+
+    const setMessage = (msg) => {
+        if (authMessage) authMessage.textContent = msg || '';
+    };
+
+    const openAuth = (step = 'login', ctx = {}) => {
+        authStep = step;
+        authContext = ctx;
+        if (overlay) {
+            overlay.hidden = false;
+            overlay.setAttribute('aria-hidden', 'false');
+        }
+        renderAuth();
+    };
+
+    const closeAuth = () => {
+        if (!overlay) return;
+        overlay.hidden = true;
+        overlay.setAttribute('aria-hidden', 'true');
+    };
+
+    const renderAuth = () => {
+        if (!authView) return;
+        clearInterval(resendTimer);
+        clearTimeout(usernameTimer);
+        setMessage('');
+
+        if (authStep === 'account') {
+            authTitle.innerHTML = 'PLAYER <span>PROFILE</span>';
+            setMessage('Manage your player profile and security credentials.');
+            authView.innerHTML = `
+                <div class="auth-account">
+                    <div class="auth-account-badge">
+                        <div class="auth-account-info">
+                            <strong class="auth-account-username">@${currentUser?.username || 'PLAYER'}</strong>
+                            <span class="auth-account-email">${currentUser?.email || 'Authenticated User'}</span>
+                        </div>
+                        <div class="auth-account-xp">${currentUser?.xp || 0} XP</div>
+                    </div>
+                    <div class="auth-account-actions">
+                        <button class="game-action-button auth-update-pw-btn" type="button" data-auth-start-update-pw>UPDATE PASSWORD</button>
+                        <button class="game-secondary-button auth-logout-btn" type="button" data-auth-logout>LOG OUT</button>
+                    </div>
+                </div>
+            `;
+            if (navEl) navEl.hidden = true;
+            return;
+        }
+
+        if (authStep === 'update-password') {
+            authTitle.innerHTML = 'SECURITY <span>SETTINGS</span>';
+            setMessage('We sent a 6-digit verification code to ' + (currentUser?.email || 'your email') + '. Enter code and new password.');
+            authView.innerHTML = `
+                <form class="auth-form" data-auth-action="update-password">
+                    <h3>UPDATE YOUR PASSWORD</h3>
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="auth-upd-otp">EMAIL VERIFICATION CODE</label>
+                        <input id="auth-upd-otp" name="otp" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code" required>
+                    </div>
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="auth-upd-newpass">NEW PASSWORD</label>
+                        <input id="auth-upd-newpass" name="newPassword" type="password" minlength="6" autocomplete="new-password" placeholder="At least 6 characters" required>
+                    </div>
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="auth-upd-confpass">CONFIRM NEW PASSWORD</label>
+                        <input id="auth-upd-confpass" name="confirmNewPassword" type="password" minlength="6" autocomplete="new-password" placeholder="Repeat new password" required>
+                    </div>
+                    <button class="game-action-button" type="submit">SAVE NEW PASSWORD</button>
+                    <button class="game-secondary-button" type="button" data-auth-switch="account">BACK TO PROFILE</button>
+                </form>
+            `;
+            if (navEl) navEl.hidden = true;
+            authView.querySelector('input')?.focus();
+            return;
+        }
+
+        if (authStep === 'otp') {
+            authTitle.innerHTML = 'EMAIL <span>VERIFICATION</span>';
+            setMessage('We sent a 6-digit code to ' + authContext.email + '. Enter it below to continue creating your account.');
+            authView.innerHTML = `
+                <form class="auth-form" data-auth-action="verify-otp">
+                    <h3>ENTER 6-DIGIT CODE</h3>
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="auth-otp-input">VERIFICATION CODE</label>
+                        <input id="auth-otp-input" name="otp" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6 digit code" required>
+                    </div>
+                    <button class="game-action-button" type="submit">VERIFY CODE</button>
+                    <button class="game-secondary-button" type="button" data-auth-resend>RESEND CODE</button>
+                </form>
+            `;
+            if (navEl) {
+                navEl.hidden = false;
+                navEl.innerHTML = `
+                    <div class="auth-nav-row">
+                        <button type="button" class="auth-nav-link" data-auth-switch="signup">USE ANOTHER EMAIL</button>
+                        <button type="button" class="auth-nav-link secondary" data-auth-switch="login">BACK TO SIGN IN</button>
+                    </div>
+                `;
+            }
+            authView.querySelector('input')?.focus();
+            return;
+        }
+
+        if (authStep === 'username') {
+            authTitle.innerHTML = 'SETUP <span>IDENTITY</span>';
+            setMessage('Choose your unique gaming handle and password.');
+            authView.innerHTML = `
+                <form class="auth-form" data-auth-action="register">
+                    <h3>CREATE PROFILE & PASSWORD</h3>
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="auth-reg-user">CHOOSE USERNAME</label>
+                        <input id="auth-reg-user" name="username" type="text" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username" placeholder="Unique handle" required>
+                        <p id="username-status" class="username-status" aria-live="polite">Use 3–20 letters, numbers, or underscores.</p>
+                    </div>
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="auth-reg-pass">PASSWORD</label>
+                        <input id="auth-reg-pass" name="password" type="password" minlength="6" autocomplete="new-password" placeholder="At least 6 characters" required>
+                    </div>
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="auth-reg-conf">CONFIRM PASSWORD</label>
+                        <input id="auth-reg-conf" name="confirmPassword" type="password" minlength="6" autocomplete="new-password" placeholder="Repeat your password" required>
+                    </div>
+                    <button class="game-action-button" type="submit" disabled>COMPLETE SIGN UP</button>
+                </form>
+            `;
+            if (navEl) navEl.hidden = true;
+            authView.querySelector('input')?.focus();
+            return;
+        }
+
+        if (authStep === 'signup') {
+            authTitle.innerHTML = 'JOIN THE <span>UNIVERSE</span>';
+            setMessage('Enter your email address to receive a 6-digit verification code to create your account.');
+            authView.innerHTML = `
+                <form class="auth-form" data-auth-action="send-otp">
+                    <h3>CREATE ACCOUNT</h3>
+                    <div class="auth-field">
+                        <label class="auth-field-label" for="auth-signup-email">EMAIL ADDRESS</label>
+                        <input id="auth-signup-email" name="email" type="email" maxlength="254" autocomplete="email" placeholder="you@example.com" required>
+                    </div>
+                    <button class="game-action-button" type="submit">SEND VERIFICATION CODE</button>
+                </form>
+            `;
+            if (navEl) {
+                navEl.hidden = false;
+                navEl.innerHTML = `
+                    <div class="auth-nav-row">
+                        <button type="button" class="auth-nav-link" data-auth-switch="login">ALREADY REGISTERED? SIGN IN</button>
+                    </div>
+                `;
+            }
+            authView.querySelector('input')?.focus();
+            return;
+        }
+
+        // Default: 'login' (Password sign in)
+        authTitle.innerHTML = 'ENTER THE <span>UNIVERSE</span>';
+        setMessage('Sign in with your username/email and password.');
+        authView.innerHTML = `
+            <div class="auth-mode-switch">
+                <button type="button" class="auth-tab active" data-auth-switch="login">PASSWORD SIGN IN</button>
+                <button type="button" class="auth-tab" data-auth-switch="signup">EMAIL CODE / SIGN UP</button>
+            </div>
+            <form class="auth-form" data-auth-action="login">
+                <div class="auth-field">
+                    <label class="auth-field-label" for="auth-login-identifier">USERNAME OR EMAIL</label>
+                    <input id="auth-login-identifier" name="identifier" type="text" autocomplete="username" placeholder="Enter username or email" required>
+                </div>
+                <div class="auth-field">
+                    <label class="auth-field-label" for="auth-login-password">PASSWORD</label>
+                    <input id="auth-login-password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+                </div>
+                <button class="game-action-button" type="submit">SIGN IN</button>
+            </form>
+        `;
+        if (navEl) {
+            navEl.hidden = false;
+            navEl.innerHTML = `
+                <div class="auth-nav-row">
+                    <button type="button" class="auth-nav-link" data-auth-switch="signup">NEW HERE? CREATE ACCOUNT</button>
+                </div>
+            `;
+        }
+        authView.querySelector('input')?.focus();
+    };
+
+    const handleAuthSubmit = async (form) => {
+        const action = form.dataset.authAction;
+        const origin = window.GamingSession?.apiOrigin || '';
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+
+        try {
+            if (action === 'login') {
+                const identifier = form.identifier.value.trim();
+                const password = form.password.value;
+                const res = await window.GamingSession.fetch(`${origin}/api/v1/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ identifier, password })
+                });
+                const body = await res.json();
+                if (!res.ok) throw new Error(body.error?.message || 'Login failed.');
+                const user = body.data?.user || body.data;
+                updateNavUser(user);
+                closeAuth();
+                window.GamingSession?.identityChanged();
+            } else if (action === 'send-otp') {
+                const email = form.email.value.trim().toLowerCase();
+                const res = await window.GamingSession.fetch(`${origin}/api/v1/auth/otp/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const body = await res.json();
+                if (!res.ok) throw new Error(body.error?.message || 'Could not send verification code.');
+                openAuth('otp', { email });
+            } else if (action === 'verify-otp') {
+                const otp = form.otp.value.trim();
+                const res = await window.GamingSession.fetch(`${origin}/api/v1/auth/otp/verify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: authContext.email, otp })
+                });
+                const body = await res.json();
+                if (!res.ok) throw new Error(body.error?.message || 'Invalid verification code.');
+                openAuth('username', { email: authContext.email, otp });
+            } else if (action === 'register') {
+                const username = form.username.value.trim();
+                const password = form.password.value;
+                const confirmPassword = form.confirmPassword.value;
+                if (password !== confirmPassword) throw new Error('Passwords do not match.');
+                const res = await window.GamingSession.fetch(`${origin}/api/v1/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: authContext.email, otp: authContext.otp, username, password })
+                });
+                const body = await res.json();
+                if (!res.ok) throw new Error(body.error?.message || 'Registration failed.');
+                const user = body.data?.user || body.data;
+                updateNavUser(user);
+                closeAuth();
+                window.GamingSession?.identityChanged();
+            } else if (action === 'update-password') {
+                const otp = form.otp.value.trim();
+                const newPassword = form.newPassword.value;
+                const confirmNewPassword = form.confirmNewPassword.value;
+                if (newPassword !== confirmNewPassword) throw new Error('Passwords do not match.');
+                const res = await window.GamingSession.fetch(`${origin}/api/v1/auth/password/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ otp, newPassword })
+                });
+                const body = await res.json();
+                if (!res.ok) throw new Error(body.error?.message || 'Password update failed.');
+                setMessage('Password updated successfully!');
+                setTimeout(() => openAuth('account'), 1200);
+            }
+        } catch (err) {
+            setMessage(err.message || 'An error occurred.');
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    };
+
+    authView?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        handleAuthSubmit(e.target);
+    });
+
+    document.addEventListener('click', async (e) => {
+        const switchBtn = e.target.closest('[data-auth-switch]');
+        if (switchBtn) {
+            openAuth(switchBtn.dataset.authSwitch);
+            return;
+        }
+
+        if (e.target.closest('[data-auth-start-update-pw]')) {
+            try {
+                const origin = window.GamingSession?.apiOrigin || '';
+                const res = await window.GamingSession.fetch(`${origin}/api/v1/auth/password/otp/send`, { method: 'POST' });
+                const body = await res.json();
+                if (!res.ok) throw new Error(body.error?.message || 'Could not send verification code.');
+                openAuth('update-password');
+            } catch (err) {
+                setMessage(err.message || 'Could not send update code.');
+            }
+            return;
+        }
+
+        if (e.target.closest('[data-auth-logout]')) {
+            try {
+                const origin = window.GamingSession?.apiOrigin || '';
+                await window.GamingSession.fetch(`${origin}/api/v1/auth/logout`, { method: 'POST' });
+            } catch (_err) {}
+            window.GamingSession?.clearSession();
+            updateNavUser(null);
+            closeAuth();
+            window.GamingSession?.identityChanged();
+            return;
+        }
+    });
+
+    authView?.addEventListener('input', async (e) => {
+        if (e.target.id === 'auth-reg-user') {
+            const val = e.target.value.trim();
+            const statusEl = document.getElementById('username-status');
+            const submitBtn = authView.querySelector('button[type="submit"]');
+            if (val.length < 3) {
+                if (statusEl) { statusEl.textContent = 'Minimum 3 characters.'; statusEl.className = 'username-status is-error'; }
+                if (submitBtn) submitBtn.disabled = true;
+                return;
+            }
+            clearTimeout(usernameTimer);
+            usernameTimer = setTimeout(async () => {
+                try {
+                    const origin = window.GamingSession?.apiOrigin || '';
+                    const res = await window.GamingSession.fetch(`${origin}/api/v1/auth/username/check?username=${encodeURIComponent(val)}`);
+                    const data = await res.json();
+                    if (data.data?.available) {
+                        if (statusEl) { statusEl.textContent = `@${val} is available!`; statusEl.className = 'username-status is-available'; }
+                        if (submitBtn) submitBtn.disabled = false;
+                    } else {
+                        if (statusEl) { statusEl.textContent = `@${val} is taken. Try another.`; statusEl.className = 'username-status is-error'; }
+                        if (submitBtn) submitBtn.disabled = true;
+                    }
+                } catch (_e) {}
+            }, 300);
+        }
+    });
+
+    playerBtn?.addEventListener('click', () => {
+        if (currentUser) openAuth('account');
+        else openAuth('login');
+    });
+
+    closeBtn?.addEventListener('click', closeAuth);
+    overlay?.addEventListener('click', (e) => {
+        if (e.target === overlay) closeAuth();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && overlay && !overlay.hidden) closeAuth();
+    });
+})();
+
+})();
+</script>
+</body>
+</html>
