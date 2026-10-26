@@ -1111,244 +1111,348 @@ function drawBowler() {
  *   * Two-hand clamped grip: Left hand high guiding, right hand low powering.
  *   * 4 Micro-animation states: Idle Tap, Back-Lift, Swing & Follow-through, Miss.
  */
+/* ==========================================================================
+   9. RIGHT-HANDED BATSMAN — REFERENCE-QUALITY ATHLETIC STANCE
+   ========================================================================== */
+
+/**
+ * Draws a tall, proportional right-handed batsman in authentic side-on stance
+ * matching professional cricket game art style.
+ *
+ * Visual reference: Tall athletic figure, 3/4 side-on view facing bowler.
+ * - Body slightly angled (left shoulder toward bowler, right shoulder back)
+ * - Head turned fully up-screen looking at the bowler
+ * - White batting pads with knee rolls
+ * - Team-colored jersey with accents
+ * - Bat held naturally down near the crease
+ * - 4 animation phases: Idle Tap → Back-Lift → Swing → Miss
+ */
 function drawBatsman() {
     const team = G.playerTeam || TEAMS[0];
 
-    // Right-Handed batsman stands on the popping crease, left of stumps (leg-stump line)
-    const bx = W / 2 - 20;
-    const by = PITCH_GEOM.botY - 20;
+    // Batsman stands on the popping crease, slightly left of stumps (leg-stump guard)
+    const bx = W / 2 - 16;
+    const by = PITCH_GEOM.botY - 18;
 
     ctx.save();
     ctx.translate(bx, by);
 
-    // -------------------------------------------------------------
-    // ANIMATION STATE MACHINE (Phases A, B, C, D)
-    // -------------------------------------------------------------
-    let phaseMode = 'idle';
+    // ── ANIMATION STATE MACHINE ──
     let tapOffset = 0;
     let breathY = 0;
-    let batAngle = -0.55; // Resting angle pointing downward near back foot
-    let batPivotX = 8;
-    let batPivotY = -12;
-    let leftElbowX = -15, leftElbowY = -18;
+    let batAngle = -0.50;
+    let batPivotX = 6;
+    let batPivotY = -8;
+    let leftElbowX = -12, leftElbowY = -14;
     let torsoDip = 0;
+    let frontKneeBend = 0;
 
     const isMissState = G.missTimer > 0 || (G.phase === 'result' && G.lastResult && (G.lastResult.type === 'bowled' || G.lastResult.type === 'miss' || G.lastResult.runs === 0));
 
     if (isMissState) {
-        // PHASE D: THE MISS STATE
-        phaseMode = 'miss';
-        torsoDip = 4;
-        batAngle = -0.18;
-        batPivotX = 3;
-        batPivotY = -6;
-        leftElbowX = -13; leftElbowY = -10;
+        torsoDip = 5;
+        batAngle = -0.15;
+        batPivotX = 2;
+        batPivotY = -4;
+        leftElbowX = -10; leftElbowY = -8;
+        frontKneeBend = 3;
     } else if (G.swinging || G.swingPhase > 0) {
-        // PHASE C: THE SWING (Click/Tap Interaction)
-        phaseMode = 'swing';
         const sp = clamp(G.swingPhase, 0, 1);
         const contactMade = G.lastResult && G.lastResult.runs > 0;
-
         if (contactMade) {
-            // Finishes high over the left shoulder on contact!
             batAngle = lerp(-2.2, 1.85, Math.pow(sp, 0.85));
-            batPivotX = lerp(10, -10, sp);
-            batPivotY = lerp(-22, -26, sp);
-            leftElbowX = lerp(-14, -20, sp);
-            leftElbowY = lerp(-26, -30, sp);
+            batPivotX = lerp(8, -12, sp);
+            batPivotY = lerp(-20, -28, sp);
+            leftElbowX = lerp(-12, -22, sp);
+            leftElbowY = lerp(-24, -32, sp);
+            frontKneeBend = lerp(0, 4, sp);
         } else {
-            // Sweeping through contact zone
-            batAngle = lerp(-2.2, -0.65, Math.pow(sp, 0.9));
-            batPivotX = lerp(10, 0, sp);
-            batPivotY = lerp(-22, -14, sp);
-            leftElbowX = lerp(-14, -18, sp);
-            leftElbowY = lerp(-26, -20, sp);
+            batAngle = lerp(-2.2, -0.60, Math.pow(sp, 0.9));
+            batPivotX = lerp(8, 0, sp);
+            batPivotY = lerp(-20, -10, sp);
+            leftElbowX = lerp(-12, -16, sp);
+            leftElbowY = lerp(-24, -18, sp);
         }
     } else if (G.phase === 'ball' || (G.phase === 'bowling' && G.bowlerAnim > 0.45)) {
-        // PHASE B: BOWLER'S RELEASE (The Back-Lift)
-        phaseMode = 'backlift';
         const liftProg = G.phase === 'ball' ? clamp(G.ballProgress / 0.35, 0, 1) : clamp((G.bowlerAnim - 0.45) / 0.55, 0, 1);
-        batAngle = lerp(-0.55, -2.15, Math.pow(liftProg, 0.75));
-        batPivotX = lerp(8, 10, liftProg);
-        batPivotY = lerp(-12, -22, liftProg);
-        leftElbowX = lerp(-15, -18, liftProg);
-        leftElbowY = lerp(-14, -22, liftProg);
+        batAngle = lerp(-0.50, -2.15, Math.pow(liftProg, 0.75));
+        batPivotX = lerp(6, 8, liftProg);
+        batPivotY = lerp(-8, -20, liftProg);
+        leftElbowX = lerp(-12, -16, liftProg);
+        leftElbowY = lerp(-14, -24, liftProg);
     } else {
-        // PHASE A: THE IDLE TAP (Pre-Delivery)
-        phaseMode = 'idle';
+        // IDLE TAP
         const tapCycle = (G.batTapTimer % 0.8) / 0.8;
         const tapPhase = Math.sin(tapCycle * Math.PI * 2);
-        tapOffset = Math.max(0, -tapPhase) * 7.5; // Raises 0 to 7.5px and taps down
-
-        breathY = Math.sin(G.batTapTimer * Math.PI * 2 / 1.6) * 1.8;
-
-        batAngle = -0.55;
-        batPivotX = 8;
-        batPivotY = -12 - tapOffset + breathY;
-        leftElbowX = -15;
+        tapOffset = Math.max(0, -tapPhase) * 6;
+        breathY = Math.sin(G.batTapTimer * Math.PI * 2 / 1.6) * 1.5;
+        batAngle = -0.50;
+        batPivotX = 6;
+        batPivotY = -8 - tapOffset + breathY;
+        leftElbowX = -12;
         leftElbowY = -14 + breathY;
     }
 
-    // 1. Soft Ground Shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    // ═══════════════════════════════════════
+    // GROUND SHADOW
+    // ═══════════════════════════════════════
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
     ctx.beginPath();
-    ctx.ellipse(0, 22, 20, 6.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(2, 24, 22, 7, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 2. Pure White Cricket Spikes
+    // ═══════════════════════════════════════
+    // SHOES — Pure White Cricket Spikes
+    // ═══════════════════════════════════════
+    // Back foot (right foot, inside crease near stumps)
     ctx.fillStyle = '#ffffff';
-    // Back shoe (Right foot inside crease)
-    roundRect(3, 21, 13, 5, 2); ctx.fill();
-    // Front shoe (Left foot forward)
-    roundRect(-15, 17 + torsoDip * 0.4, 13, 5, 2); ctx.fill();
-    // Spikes sole tread
-    ctx.fillStyle = '#cbd5e1';
-    ctx.fillRect(4, 24, 11, 2);
-    ctx.fillRect(-14, 20 + torsoDip * 0.4, 11, 2);
+    roundRect(2, 22, 14, 5, 2.5); ctx.fill();
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillRect(3, 25, 12, 2);
 
-    // 3. Colored Batting Pads (Matching Team Jersey: team.primary!)
-    // Back Leg / Pad (Right Leg - anchored closer to stumps)
-    ctx.fillStyle = team.primary;
-    roundRect(4, 2, 11, 20, 4); ctx.fill();
-    // Back Pad Depth & Knee Roll Ridges
-    ctx.fillStyle = 'rgba(0,0,0,0.22)';
-    ctx.fillRect(4, 7, 11, 2.5);
-    ctx.fillRect(4, 12, 11, 2.5);
-    ctx.fillRect(13, 2, 2, 20); // Inner leg shadow
+    // Front foot (left foot, slightly forward on pitch toward bowler)
+    ctx.fillStyle = '#ffffff';
+    roundRect(-16, 18 + torsoDip * 0.3 + frontKneeBend * 0.5, 14, 5, 2.5); ctx.fill();
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillRect(-15, 21 + torsoDip * 0.3 + frontKneeBend * 0.5, 12, 2);
 
-    // Front Leg / Pad (Left Leg - forward towards pitch / bowler)
-    ctx.fillStyle = team.primary;
-    roundRect(-15, -5 + torsoDip * 0.4, 12, 23, 4); ctx.fill();
-    // Front Pad 3D Highlight & Knee Roll Ridges
-    ctx.fillStyle = 'rgba(255,255,255,0.25)';
-    ctx.fillRect(-14, -4 + torsoDip * 0.4, 3, 21); // Shin highlight
-    ctx.fillStyle = 'rgba(0,0,0,0.22)';
-    ctx.fillRect(-15, 1 + torsoDip * 0.4, 12, 2.5);
-    ctx.fillRect(-15, 6 + torsoDip * 0.4, 12, 2.5);
-    ctx.fillRect(-15, 11 + torsoDip * 0.4, 12, 2.5);
-    // Pad outline for crisp clarity
-    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
-    ctx.lineWidth = 1;
-    roundRect(-15, -5 + torsoDip * 0.4, 12, 23, 4); ctx.stroke();
+    // ═══════════════════════════════════════
+    // BATTING PADS — White with Knee Rolls (like reference image)
+    // ═══════════════════════════════════════
+    const padColor = '#f0f4f8';
+    const padStrap = '#d1d9e6';
+    const padHighlight = '#ffffff';
 
-    // 4. Slender Athletic Torso (Side-on profile: Width 18px, Height 28px)
+    // Back Pad (Right Leg — closer to stumps)
+    ctx.fillStyle = padColor;
+    roundRect(3, 0, 13, 23, 4); ctx.fill();
+    // 3D highlight on front face
+    ctx.fillStyle = padHighlight;
+    ctx.fillRect(4, 1, 4, 21);
+    // Knee roll ridges
+    ctx.fillStyle = padStrap;
+    ctx.fillRect(4, 5, 11, 2.5);
+    ctx.fillRect(4, 10, 11, 2.5);
+    ctx.fillRect(4, 15, 11, 2.5);
+    // Subtle outline
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+    ctx.lineWidth = 0.8;
+    roundRect(3, 0, 13, 23, 4); ctx.stroke();
+
+    // Front Pad (Left Leg — forward toward bowler)
+    const fpY = -6 + torsoDip * 0.3 + frontKneeBend * 0.5;
+    ctx.fillStyle = padColor;
+    roundRect(-16, fpY, 13, 25, 4); ctx.fill();
+    ctx.fillStyle = padHighlight;
+    ctx.fillRect(-15, fpY + 1, 4, 23);
+    ctx.fillStyle = padStrap;
+    ctx.fillRect(-15, fpY + 4, 12, 2.5);
+    ctx.fillRect(-15, fpY + 9, 12, 2.5);
+    ctx.fillRect(-15, fpY + 14, 12, 2.5);
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+    ctx.lineWidth = 0.8;
+    roundRect(-16, fpY, 13, 25, 4); ctx.stroke();
+
+    // ═══════════════════════════════════════
+    // TORSO — Athletic Side-On Jersey
+    // ═══════════════════════════════════════
     ctx.save();
     ctx.translate(0, breathY + torsoDip);
 
-    // Jersey Gradient in team.primary
-    const bodyGrad = ctx.createLinearGradient(-13, -30, 7, 0);
-    bodyGrad.addColorStop(0, team.primary);
-    bodyGrad.addColorStop(1, '#0a192f');
-    ctx.fillStyle = bodyGrad;
-    roundRect(-13, -30, 18, 28, 5); ctx.fill();
+    // Main jersey body — side-on profile (narrower than front-on)
+    const jerseyGrad = ctx.createLinearGradient(-14, -38, 8, -4);
+    jerseyGrad.addColorStop(0, team.primary);
+    jerseyGrad.addColorStop(0.7, team.primary);
+    jerseyGrad.addColorStop(1, 'rgba(0,0,0,0.35)');
+    ctx.fillStyle = jerseyGrad;
 
-    // Side Athletic Stripe & Team Accents (Side profile)
-    ctx.fillStyle = team.secondary;
-    ctx.fillRect(-13, -30, 3.5, 28); // Front shoulder/chest stripe facing bowler
-    ctx.fillRect(-6, -30, 10, 3);    // Collar trim
-
-    // Jersey Number 7 (Slender side profile placement)
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.font = 'bold 9.5px Arial';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('7', -3, -16);
-
-    // 5. Cricket Helmet & Head (Turned 90° looking over front shoulder UP at bowler!)
-    // Helmet Shell Dome
-    ctx.fillStyle = team.primary;
+    // Torso shape — slightly tapered athletic build
     ctx.beginPath();
-    ctx.arc(-3, -39, 10, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Helmet Trim Rim
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(-10, -36, 14, 3);
-
-    // Visor Peak (Pointing cleanly UP-SCREEN towards approaching bowler - smooth athletic curve, no horns!)
-    ctx.fillStyle = '#0f172a';
-    ctx.beginPath();
-    ctx.moveTo(-9, -40);
-    ctx.lineTo(-9, -48);
-    ctx.lineTo(-3, -42);
+    ctx.moveTo(-11, -4);    // Left hip (front)
+    ctx.lineTo(-13, -20);   // Left waist
+    ctx.lineTo(-14, -32);   // Left shoulder (front shoulder facing bowler)
+    ctx.lineTo(-8, -36);    // Left shoulder top
+    ctx.lineTo(6, -36);     // Right shoulder top (back, away from bowler)
+    ctx.lineTo(8, -32);     // Right shoulder
+    ctx.lineTo(6, -20);     // Right waist
+    ctx.lineTo(5, -4);      // Right hip
     ctx.closePath();
     ctx.fill();
 
-    // Ear Protection Guard
-    ctx.fillStyle = '#0f172a';
+    // Team accent stripe on front shoulder
+    ctx.fillStyle = team.secondary;
+    ctx.fillRect(-14, -36, 4, 32);
+
+    // V-neck collar
+    ctx.strokeStyle = team.secondary;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.ellipse(-1, -38, 3, 4.5, 0, 0, Math.PI * 2);
+    ctx.moveTo(-8, -36);
+    ctx.lineTo(-3, -32);
+    ctx.lineTo(3, -36);
+    ctx.stroke();
+
+    // Team name on chest
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    ctx.font = 'bold 6px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(team.code, -3, -26);
+
+    // Jersey Number on back
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.font = 'bold 11px Arial';
+    ctx.fillText('7', 0, -18);
+
+    // ═══════════════════════════════════════
+    // HEAD & HELMET — Clean Rounded Helmet Facing Bowler
+    // ═══════════════════════════════════════
+    // Neck
+    ctx.fillStyle = '#d4a574';
+    ctx.fillRect(-5, -40, 7, 5);
+
+    // Head base (slightly turned toward bowler — 3/4 view)
+    ctx.fillStyle = '#d4a574';
+    ctx.beginPath();
+    ctx.ellipse(-2, -46, 8, 9, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Face Grille (Clean stainless steel protective bars looking UP at bowler)
-    ctx.strokeStyle = '#cbd5e1';
-    ctx.lineWidth = 1.3;
+    // Helmet shell (covers top and sides of head)
+    ctx.fillStyle = team.primary;
     ctx.beginPath();
-    ctx.moveTo(-11, -39); ctx.lineTo(-4, -36);
-    ctx.moveTo(-12, -36); ctx.lineTo(-3, -33);
-    ctx.moveTo(-10, -33); ctx.lineTo(-3, -30);
+    ctx.arc(-2, -48, 9.5, Math.PI, Math.PI * 2 + 0.3);
+    ctx.fill();
+
+    // Helmet side panel
+    ctx.fillStyle = team.primary;
+    ctx.beginPath();
+    ctx.ellipse(-2, -47, 9.5, 8, 0, -0.5, 0.6);
+    ctx.fill();
+
+    // Helmet ear guard (left side, facing viewer in 3/4 view)
+    ctx.fillStyle = team.primary;
+    roundRect(-12, -50, 4, 10, 2); ctx.fill();
+
+    // Visor peak — clean short brim pointing UP-SCREEN at bowler
+    ctx.fillStyle = '#1a1a2e';
+    ctx.beginPath();
+    ctx.moveTo(-10, -50);
+    ctx.quadraticCurveTo(-8, -58, -1, -55);
+    ctx.lineTo(-4, -50);
+    ctx.closePath();
+    ctx.fill();
+
+    // Face grille (3 clean horizontal bars — stainless steel look)
+    ctx.strokeStyle = '#b0bec5';
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.moveTo(-12, -47); ctx.lineTo(-5, -44);
+    ctx.moveTo(-13, -44); ctx.lineTo(-5, -41);
+    ctx.moveTo(-12, -41); ctx.lineTo(-5, -38);
+    ctx.stroke();
+
+    // Grille vertical struts
+    ctx.beginPath();
+    ctx.moveTo(-10, -48); ctx.lineTo(-9, -38);
+    ctx.moveTo(-7, -48);  ctx.lineTo(-6, -38);
     ctx.stroke();
 
     ctx.restore(); // End Torso & Head Translation
 
-    // 6. Arms & Two-Hand Clamped Grip (Guiding Left Hand, Powering Right Hand)
-    // Left Arm (High front guide arm pointing towards bowler)
+    // ═══════════════════════════════════════
+    // ARMS & HANDS — Two-Hand Bat Grip
+    // ═══════════════════════════════════════
+
+    // Left Arm (front guide arm — jersey sleeve color)
     ctx.strokeStyle = team.primary;
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 4.5;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(-11, -24 + breathY + torsoDip);
-    ctx.lineTo(leftElbowX, leftElbowY + torsoDip);
-    ctx.lineTo(batPivotX - 2, batPivotY - 5);
+    ctx.moveTo(-12, -26 + breathY + torsoDip); // Shoulder
+    ctx.lineTo(leftElbowX, leftElbowY + torsoDip); // Elbow
+    ctx.lineTo(batPivotX - 2, batPivotY - 4); // Wrist → top of bat handle
     ctx.stroke();
 
-    // Right Arm (Back power arm tucked against side)
+    // Exposed forearm skin below sleeve
+    ctx.strokeStyle = '#d4a574';
+    ctx.lineWidth = 3.5;
     ctx.beginPath();
-    ctx.moveTo(4, -18 + breathY + torsoDip);
-    ctx.lineTo(7, -11 + breathY + torsoDip);
+    ctx.moveTo(leftElbowX, leftElbowY + torsoDip);
+    ctx.lineTo(batPivotX - 2, batPivotY - 4);
+    ctx.stroke();
+
+    // Right Arm (back power arm)
+    ctx.strokeStyle = team.primary;
+    ctx.lineWidth = 4.5;
+    ctx.beginPath();
+    ctx.moveTo(5, -22 + breathY + torsoDip); // Shoulder
+    ctx.lineTo(8, -14 + breathY + torsoDip); // Elbow
+    ctx.lineTo(batPivotX, batPivotY); // Wrist → bottom of bat handle
+    ctx.stroke();
+
+    ctx.strokeStyle = '#d4a574';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(8, -14 + breathY + torsoDip);
     ctx.lineTo(batPivotX, batPivotY);
     ctx.stroke();
 
-    // Pure White Padded Batting Gloves (#ffffff with team accents)
+    // Batting Gloves (white leather with padded knuckle rolls)
     ctx.fillStyle = '#ffffff';
-    // Left glove (top of handle)
-    ctx.beginPath(); ctx.arc(batPivotX - 2, batPivotY - 5, 4.2, 0, Math.PI * 2); ctx.fill();
-    // Right glove (bottom of handle)
-    ctx.beginPath(); ctx.arc(batPivotX, batPivotY, 4.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(batPivotX - 2, batPivotY - 4, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(batPivotX, batPivotY, 4, 0, Math.PI * 2); ctx.fill();
+    // Glove padding ridges
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillRect(batPivotX - 5, batPivotY - 6, 3, 3);
+    ctx.fillRect(batPivotX - 3, batPivotY - 2, 3, 3);
 
-    // Glove rubber finger protection rolls
-    ctx.fillStyle = team.secondary;
-    ctx.fillRect(batPivotX - 4, batPivotY - 7, 3.5, 3);
-    ctx.fillRect(batPivotX - 2, batPivotY - 2, 3.5, 3);
-
-    // 7. English Willow Bat Asset
+    // ═══════════════════════════════════════
+    // BAT — English Willow with Realistic Proportions
+    // ═══════════════════════════════════════
     ctx.save();
     ctx.translate(batPivotX, batPivotY);
     ctx.rotate(batAngle);
 
-    // Rubber Handle Grip
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(0, -2.2, 11, 4.4);
-    ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 0.8;
-    ctx.strokeRect(0, -2.2, 11, 4.4);
+    // Rubber Handle Grip (dark with chevron tape)
+    ctx.fillStyle = '#2d2d3f';
+    roundRect(0, -2.5, 12, 5, 1.5); ctx.fill();
+    // Grip tape chevrons
+    ctx.strokeStyle = '#6b7280';
+    ctx.lineWidth = 0.6;
+    for (let g = 2; g < 11; g += 2.5) {
+        ctx.beginPath();
+        ctx.moveTo(g, -2.5); ctx.lineTo(g + 1.5, 0); ctx.lineTo(g, 2.5);
+        ctx.stroke();
+    }
 
-    // Willow Blade Wood Gradient
-    const woodGrad = ctx.createLinearGradient(11, -5.5, 44, 7);
-    woodGrad.addColorStop(0, '#fde68a');
-    woodGrad.addColorStop(0.4, '#d97706');
-    woodGrad.addColorStop(1, '#b45309');
+    // Bat Shoulder (transition from handle to blade)
+    ctx.fillStyle = '#e8c96a';
+    roundRect(11, -3.5, 4, 7, 1); ctx.fill();
+
+    // Willow Blade (wood grain gradient)
+    const woodGrad = ctx.createLinearGradient(15, -6, 48, 6);
+    woodGrad.addColorStop(0, '#f5deb3');
+    woodGrad.addColorStop(0.3, '#deb887');
+    woodGrad.addColorStop(0.6, '#d2a55e');
+    woodGrad.addColorStop(1, '#b8860b');
     ctx.fillStyle = woodGrad;
-    roundRect(11, -5.5, 34, 10, 2.5);
+    roundRect(15, -6, 30, 11, 2);
     ctx.fill();
 
-    // Red Sponsor Sticker
-    ctx.fillStyle = '#ef4444';
-    ctx.fillRect(15, -5, 8, 9);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(17, -3.5, 4, 6);
+    // Blade edge highlight (gives 3D depth)
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillRect(15, -6, 30, 3);
 
-    // Curved Toe Guard
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(42, -5.5, 3, 10);
+    // Sponsor sticker (red with white logo)
+    ctx.fillStyle = '#dc2626';
+    roundRect(19, -4.5, 9, 8, 1.5); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 5px Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('SS', 23.5, -0.5);
+
+    // Toe guard (protective rubber tip)
+    ctx.fillStyle = '#1a1a2e';
+    roundRect(43, -6, 3, 11, 1); ctx.fill();
 
     ctx.restore(); // End Bat
     ctx.restore(); // End Batsman
