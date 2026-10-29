@@ -1918,7 +1918,8 @@
     width: 100%;
     min-width: 580px;
     max-width: 720px;
-    height: 300px;
+    height: 380px;
+    min-height: 380px;
     margin: 0 auto;
     background: linear-gradient(180deg, #07162e 0%, #030b18 100%);
     border: 1px solid var(--panel-border);
@@ -1931,16 +1932,28 @@
 }
 
 .pq-river-bank {
-    width: 180px;
+    width: 190px;
     height: 100%;
-    background: rgba(14, 30, 54, 0.8);
+    background: rgba(14, 30, 54, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 10px;
-    padding: 12px;
+    padding: 10px;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.pq-bank-items {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    margin-top: 6px;
+    box-sizing: border-box;
 }
 
 .pq-river-water {
@@ -2028,9 +2041,9 @@
 }
 
 .pq-entity-chip {
-    padding: 8px 12px;
+    padding: 6px 10px;
     border-radius: 8px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 800;
     cursor: pointer;
     user-select: none;
@@ -2039,6 +2052,16 @@
     align-items: center;
     gap: 6px;
     border: 1px solid rgba(255, 255, 255, 0.15);
+    box-sizing: border-box;
+    width: 100%;
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.pq-entity-chip.in-boat {
+    width: auto;
+    padding: 6px 8px;
+    font-size: 16px;
 }
 
 .pq-entity-chip:hover {

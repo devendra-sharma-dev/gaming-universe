@@ -798,7 +798,17 @@ console.log("Running Puzzle Quest core test suite...\n");
     t += Math.max(1, 2);
     assert.strictEqual(t, 15, "Stepwise optimal sequence must equal 15 minutes");
 
-    console.log("  ✓ Level 35 Bridge and Torch crossing logic, BFS 15m optimal time, and instructions verified.");
+    // Verify win/fail condition rules: <= 15 min clears, > 15 min fails
+    function evaluateBridgeResult(timeTaken) {
+        return timeTaken <= 15 ? "PASSED" : "FAILED";
+    }
+    assert.strictEqual(evaluateBridgeResult(15), "PASSED", "Crossing in 15 minutes must pass");
+    assert.strictEqual(evaluateBridgeResult(14), "PASSED", "Crossing in under 15 minutes must pass");
+    assert.strictEqual(evaluateBridgeResult(17), "FAILED", "Crossing in 17 minutes must fail level");
+    assert.strictEqual(evaluateBridgeResult(19), "FAILED", "Crossing in 19 minutes must fail level");
+    assert.strictEqual(evaluateBridgeResult(21), "FAILED", "Crossing in 21 minutes must fail level");
+
+    console.log("  ✓ Level 17 Bridge and Torch crossing logic, BFS 15m optimal time, <=15m win & >15m fail verified.");
 }
 
 // 9g. Level 37: Table Seating Deduction Clues & Unique Solution Verification

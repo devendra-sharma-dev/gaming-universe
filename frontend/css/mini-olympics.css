@@ -697,7 +697,8 @@
 
 .mo-game-canvas {
     width: 100%;
-    height: 100%;
+    height: auto;
+    max-height: 100%;
     display: block;
     touch-action: none;
 }
@@ -714,17 +715,23 @@
 }
 
 .mo-feedback-toast {
-    font-size: 26px;
+    font-size: 24px;
     font-weight: 800;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
     text-transform: uppercase;
-    padding: 8px 24px;
+    padding: 6px 20px;
     border-radius: 30px;
     background: rgba(0, 0, 0, 0.75);
     backdrop-filter: blur(8px);
     animation: moToastPop 0.4s ease-out forwards;
     pointer-events: none;
     z-index: 20;
+    max-width: 90%;
+    text-align: center;
+}
+
+.mo-toast-single-line {
+    white-space: nowrap !important;
 }
 
 @keyframes moToastPop {
@@ -1437,5 +1444,17 @@
 
     .mo-podium-flag { font-size: 28px; }
     .mo-podium-name { font-size: 11px; max-width: 90px; }
+
+    .mo-feedback-toast {
+        font-size: 15px;
+        padding: 5px 12px;
+        letter-spacing: 0.3px;
+        max-width: 92%;
+    }
+
+    .mo-toast-single-line {
+        white-space: nowrap !important;
+        font-size: 15px;
+    }
 }
 
