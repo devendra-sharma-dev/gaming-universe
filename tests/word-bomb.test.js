@@ -300,4 +300,31 @@ assert(v12Js.includes('openAuth("login")'), "word-bomb.js must support openAuth 
 assert(v12Js.includes('data-auth-logout'), "word-bomb.js must support logout from auth popup");
 console.log("  ✓ Header account popup, profile view, and identity controller verified.");
 
-console.log("\nAll Word Bomb Unit Tests PASSED! 💣✓");
+// 14. Testing Multiplayer REST Fallback Engine (Lobbies, Room Creation, Join, Polling)
+console.log("14. Testing Multiplayer REST Fallback Engine (Lobbies, Room Creation, Join, Polling)...");
+const wordBombRooms = require("../backend/services/wordBombRooms");
+(async () => {
+    const actor1 = { id: "user-1", username: "HostPlayer", isGuest: false };
+    const actor2 = { id: "user-2", username: "Guest2", isGuest: true };
+
+    const room = await wordBombRooms.createRoom(actor1, true);
+    assert(room && room.code && room.code.length === 6, "Must create 6-character room code");
+    assert.strictEqual(room.status, "lobby", "Initial status must be lobby");
+    assert.strictEqual(room.players.length, 1, "Must contain host player");
+
+    const joined = await wordBombRooms.joinRoom(actor2, room.code);
+    assert.strictEqual(joined.players.length, 2, "Must contain 2 players after join");
+
+    const started = await wordBombRooms.startRoom(actor1, room.code);
+    assert.strictEqual(started.status, "active", "Status must transition to active");
+    assert(started.sequence && started.sequence.length >= 2, "Must choose initial sequence");
+
+    const state = await wordBombRooms.getRoomState(room.code);
+    assert.strictEqual(state.round, 1, "Room round must be 1");
+
+    await wordBombRooms.leaveRoom(actor2, room.code);
+    await wordBombRooms.leaveRoom(actor1, room.code);
+    console.log("  ✓ Multiplayer REST engine room lifecycle (create, join, start, state, leave) verified.");
+
+    console.log("\nAll Word Bomb Unit Tests PASSED! 💣✓");
+})();
