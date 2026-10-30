@@ -65,6 +65,129 @@ router.get("/word-bomb/validate", (request, response) => {
     response.json({ success: true, valid, word });
 });
 
+
+const wordBombRooms = require("../services/wordBombRooms");
+
+const getWordBombActor = async (req) => {
+    if (req.user) {
+        return {
+            id: req.user._id.toString(),
+            userId: req.user._id.toString(),
+            username: req.user.username,
+            isGuest: false
+        };
+    }
+    const session = req.session;
+    if (session?.userId) {
+        try {
+            const user = await User.findById(session.userId).select("username xp");
+            if (user) {
+                return {
+                    id: user._id.toString(),
+                    userId: user._id.toString(),
+                    username: user.username,
+                    isGuest: false
+                };
+            }
+        } catch (_e) {}
+    }
+    const token = req.headers["x-browser-session"] || req.body?.browserToken;
+    const actorId = token ? `guest:${token.slice(0, 16)}` : `guest:${crypto.randomUUID()}`;
+    const actorName = req.body?.username || (token ? `Guest${token.slice(0, 6).toUpperCase()}` : "GUEST");
+    return {
+        id: actorId,
+        userId: null,
+        username: actorName,
+        isGuest: true
+    };
+};
+
+router.get(
+    "/word-bomb/lobbies",
+    asyncRoute(async (_request, response) => {
+        const lobbies = await wordBombRooms.getActiveLobbies();
+        response.json({ success: true, data: { lobbies } });
+    })
+);
+
+router.post(
+    "/word-bomb/room/create",
+    asyncRoute(async (request, response) => {
+        const actor = await getWordBombActor(request);
+        const isPublic = request.body?.isPublic !== false;
+        const room = await wordBombRooms.createRoom(actor, isPublic);
+        response.json({ success: true, data: { room } });
+    })
+);
+
+router.post(
+    "/word-bomb/room/join",
+    asyncRoute(async (request, response) => {
+        const actor = await getWordBombActor(request);
+        const code = String(request.body?.code || "").trim().toUpperCase();
+        try {
+            const room = await wordBombRooms.joinRoom(actor, code);
+            response.json({ success: true, data: { room } });
+        } catch (err) {
+            response.status(400).json({
+                success: false,
+                error: { message: err.message, isFull: Boolean(err.isFull) }
+            });
+        }
+    })
+);
+
+router.get(
+    "/word-bomb/room/:code",
+    asyncRoute(async (request, response) => {
+        const code = String(request.params?.code || "").trim().toUpperCase();
+        const room = await wordBombRooms.getRoomState(code);
+        if (!room) {
+            return response.status(404).json({ success: false, error: { message: "Room not found." } });
+        }
+        response.json({ success: true, data: { room } });
+    })
+);
+
+router.post(
+    "/word-bomb/room/start",
+    asyncRoute(async (request, response) => {
+        const actor = await getWordBombActor(request);
+        const code = String(request.body?.code || "").trim().toUpperCase();
+        try {
+            const room = await wordBombRooms.startRoom(actor, code);
+            response.json({ success: true, data: { room } });
+        } catch (err) {
+            response.status(400).json({ success: false, error: { message: err.message } });
+        }
+    })
+);
+
+router.post(
+    "/word-bomb/room/submit",
+    asyncRoute(async (request, response) => {
+        const actor = await getWordBombActor(request);
+        const code = String(request.body?.code || "").trim().toUpperCase();
+        const word = request.body?.word;
+        try {
+            const result = await wordBombRooms.submitWord(actor, code, word);
+            response.json({ success: true, data: result });
+        } catch (err) {
+            response.status(400).json({ success: false, error: { message: err.message } });
+        }
+    })
+);
+
+router.post(
+    "/word-bomb/room/leave",
+    asyncRoute(async (request, response) => {
+        const actor = await getWordBombActor(request);
+        const code = String(request.body?.code || "").trim().toUpperCase();
+        await wordBombRooms.leaveRoom(actor, code);
+        response.json({ success: true });
+    })
+);
+
 router.use(requireAuth);
 
 router.post(

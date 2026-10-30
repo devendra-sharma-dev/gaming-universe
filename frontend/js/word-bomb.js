@@ -293,7 +293,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                 joinCodeNotice.hidden = true;
                 joinCodeNotice.style.display = "none";
             }
-            socket.emit("word-bomb:get-lobbies");
+            fetchPublicLobbies();
+            if (socket.connected) socket.emit("word-bomb:get-lobbies");
         }
     };
 
@@ -337,7 +338,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         showLobbyNotice(`⚠️ Lobby ${code} is currently full (6/6 players). Please join another room.`);
                         return;
                     }
-                    socket.emit("word-bomb:join-room", { code });
+                    joinMultiplayerRoom(code);
                 }
             });
         });
@@ -627,6 +628,120 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     };
 
+    
+    let roomPollTimer = null;
+
+    const stopRoomPolling = () => {
+        if (roomPollTimer) {
+            clearInterval(roomPollTimer);
+            roomPollTimer = null;
+        }
+    };
+
+    const startRoomPolling = (code) => {
+        stopRoomPolling();
+        roomPollTimer = setInterval(async () => {
+            if (!room || room.code !== code || room.mode === "solo") {
+                stopRoomPolling();
+                return;
+            }
+            try {
+                const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/${code}`);
+                if (res.ok) {
+                    const body = await res.json();
+                    const nextRoom = body.data?.room;
+                    if (nextRoom) {
+                        if (nextRoom.status === "finished" && room.status !== "finished") {
+                            stopRoomPolling();
+                            render(nextRoom);
+                            const winner = nextRoom.players.find(p => p.id === nextRoom.winnerId);
+                            showFinishModal({
+                                matchId: nextRoom.matchId,
+                                mode: "multiplayer",
+                                reason: nextRoom.finishReason || "last-player",
+                                winner,
+                                wordsCount: nextRoom.usedWords?.length || 0,
+                                players: nextRoom.players
+                            });
+                            return;
+                        }
+                        render(nextRoom);
+                    }
+                }
+            } catch (_e) {}
+        }, 1000);
+    };
+
+    const fetchPublicLobbies = async () => {
+        try {
+            const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/lobbies`);
+            if (res.ok) {
+                const body = await res.json();
+                renderLobbiesList(body.data?.lobbies || []);
+            }
+        } catch (_e) {}
+    };
+
+    const createMultiplayerRoom = async (isPublic) => {
+        localSoloActive = false;
+        showLobbyNotice("Creating arena room...");
+        try {
+            const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/create`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ isPublic, username: identity?.username })
+            });
+            const body = await res.json();
+            if (res.ok && body.data?.room) {
+                if (lobbiesNotice) {
+                    lobbiesNotice.hidden = true;
+                    lobbiesNotice.style.display = "none";
+                }
+                render(body.data.room);
+                startRoomPolling(body.data.room.code);
+                if (socket.connected) {
+                    socket.emit("word-bomb:create-room", { isPublic });
+                }
+                return;
+            }
+            throw new Error(body.error?.message || "Failed to create room.");
+        } catch (err) {
+            showLobbyNotice(err.message || "Failed to create arena room.");
+        }
+    };
+
+    const joinMultiplayerRoom = async (code) => {
+        localSoloActive = false;
+        showJoinCodeNotice("Joining arena room...");
+        try {
+            const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/join`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code, username: identity?.username })
+            });
+            const body = await res.json();
+            if (res.ok && body.data?.room) {
+                if (joinCodeNotice) {
+                    joinCodeNotice.hidden = true;
+                    joinCodeNotice.style.display = "none";
+                }
+                render(body.data.room);
+                startRoomPolling(body.data.room.code);
+                if (socket.connected) {
+                    socket.emit("word-bomb:join-room", { code });
+                }
+                return;
+            }
+            if (body.error?.isFull) {
+                showJoinCodeNotice("⚠️ This room is currently full (maximum 6 players reached).");
+            } else {
+                showJoinCodeNotice(`✕ ${body.error?.message || "Could not join room."}`);
+            }
+        } catch (err) {
+            showJoinCodeNotice(err.message || "Could not join room.");
+        }
+    };
+
     // Button Actions
     const startLocalSoloStreak = () => {
         localSoloActive = true;
@@ -712,23 +827,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     $("word-bomb-create").onclick = () => {
         if (feed) feed.textContent = "";
-        localSoloActive = false;
-        if (!socket.connected) {
-            showLobbyNotice("Connecting to arena server...");
-            socket.connect();
-            const onConnect = () => {
-                socket.emit("word-bomb:create-room", { isPublic: isPublicCreation });
-            };
-            socket.once("connect", onConnect);
-            setTimeout(() => {
-                socket.off("connect", onConnect);
-                if (!socket.connected) {
-                    showLobbyNotice("Could not connect to multiplayer arena server. Please try Solo Streak or retry in a moment.");
-                }
-            }, 6000);
-            return;
-        }
-        socket.emit("word-bomb:create-room", { isPublic: isPublicCreation });
+        createMultiplayerRoom(isPublicCreation);
     };
 
     $("word-bomb-join").onclick = () => {
@@ -738,41 +837,49 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
         if (feed) feed.textContent = "";
-        localSoloActive = false;
-        if (!socket.connected) {
-            showJoinCodeNotice("Connecting to arena server...");
-            socket.connect();
-            const onConnect = () => {
-                socket.emit("word-bomb:join-room", { code });
-            };
-            socket.once("connect", onConnect);
-            setTimeout(() => {
-                socket.off("connect", onConnect);
-                if (!socket.connected) {
-                    showJoinCodeNotice("Could not connect to multiplayer arena server. Please retry in a moment.");
-                }
-            }, 6000);
-            return;
-        }
-        socket.emit("word-bomb:join-room", { code });
+        joinMultiplayerRoom(code);
     };
 
     lobbiesRefreshBtn?.addEventListener("click", () => {
-        socket.emit("word-bomb:get-lobbies");
+        fetchPublicLobbies();
+        if (socket.connected) socket.emit("word-bomb:get-lobbies");
     });
 
-    hostStartBtn?.addEventListener("click", () => {
+    hostStartBtn?.addEventListener("click", async () => {
         if (feed) feed.textContent = "";
-        socket.emit("word-bomb:start-room");
+        if (room?.code) {
+            try {
+                const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/start`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ code: room.code })
+                });
+                const body = await res.json();
+                if (res.ok && body.data?.room) {
+                    render(body.data.room);
+                } else if (body.error?.message) {
+                    if (feed) feed.textContent = `✕ ${body.error.message}`;
+                }
+            } catch (_e) {}
+        }
+        if (socket.connected) socket.emit("word-bomb:start-room");
     });
 
     // Leave button: Immediately leaves room cleanly with NO browser confirm/toast dialog!
     exitBtn?.addEventListener("click", () => {
+        stopRoomPolling();
         if (localSoloActive) {
             clearInterval(timerId);
             localSoloActive = false;
         }
-        socket.emit("word-bomb:leave");
+        if (room?.code) {
+            window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/leave`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code: room.code })
+            }).catch(() => {});
+        }
+        if (socket.connected) socket.emit("word-bomb:leave");
         room = null;
         if (feed) feed.textContent = "";
         setScreen("landing");
@@ -780,6 +887,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             modal.hidden = true;
             modal.style.display = "none";
         }
+        fetchPublicLobbies();
     });
 
     // Clear error message when user starts typing a new word
@@ -872,7 +980,28 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         if (feed) feed.textContent = "";
-        socket.emit("word-bomb:submit", { word });
+        if (room?.code) {
+            try {
+                const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/submit`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ code: room.code, word })
+                });
+                const body = await res.json();
+                if (res.ok && body.data?.valid) {
+                    if (feed) feed.textContent = "";
+                    render(body.data.room);
+                    input.value = "";
+                } else {
+                    if (feed) feed.textContent = `✕ ${body.data?.message || body.error?.message || "That word is not accepted."}`;
+                    arena?.classList.remove("arena-shake");
+                    void arena?.offsetWidth;
+                    arena?.classList.add("arena-shake");
+                    setTimeout(() => arena?.classList.remove("arena-shake"), 600);
+                }
+            } catch (_e) {}
+        }
+        if (socket.connected) socket.emit("word-bomb:submit", { word });
         input.select();
     };
 
@@ -1687,4 +1816,5 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     updateSoloHighScoreDisplay();
+    fetchPublicLobbies();
 });
