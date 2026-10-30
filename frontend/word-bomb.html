@@ -1,24 +1,388 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Word Bomb — Gaming Universe</title>
-  <link rel="stylesheet" href="./css/main.css?v=email-otp-20260915-4"><link rel="stylesheet" href="./css/word-bomb.css?v=email-otp-20260915-4">
-<script src="./js/session.js?v=email-otp-20260915-4"></script></head>
+  <link rel="stylesheet" href="./css/main.css?v=email-otp-20260915-4">
+  <link rel="stylesheet" href="./css/word-bomb.css?v=email-otp-20260915-8">
+  <script src="./js/session.js?v=email-otp-20260915-4"></script>
+</head>
 <body class="word-bomb-page">
   <header class="main-navigation">
-    <a href="./index.html" class="brand" aria-label="Gaming Universe Home"><span class="brand-controller" aria-hidden="true"><span class="controller-body"><span class="controller-stick controller-stick-left"></span><span class="controller-stick controller-stick-right"></span><span class="controller-dpad"></span><span class="controller-buttons"><span></span><span></span><span></span><span></span></span></span></span><span class="brand-name">GAMING <strong>UNIVERSE</strong></span></a>
-    <div class="navigation-search" role="search"><input id="game-search" type="search" placeholder="SEARCH GAMES" autocomplete="off" aria-label="Search games"><div id="game-search-results" class="game-search-results" hidden></div></div>
-    <nav class="navigation-links" aria-label="Main Navigation"><a href="./index.html" class="navigation-link active">HOME</a><a href="./index.html" class="navigation-link">DISCOVER</a><a href="#" class="navigation-link">LIVE</a></nav>
-    <div class="navigation-player" id="player-menu-button" role="button" tabindex="0" aria-label="Open account panel"><span class="player-status"></span><span class="player-name" id="word-bomb-identity">GUEST</span></div>
+    <a href="./index.html" class="brand" aria-label="Gaming Universe Home">
+      <span class="brand-controller" aria-hidden="true">
+        <span class="controller-body">
+          <span class="controller-stick controller-stick-left"></span>
+          <span class="controller-stick controller-stick-right"></span>
+          <span class="controller-dpad"></span>
+          <span class="controller-buttons"><span></span><span></span><span></span><span></span></span>
+        </span>
+      </span>
+      <span class="brand-name">GAMING <strong>UNIVERSE</strong></span>
+    </a>
+    <div class="navigation-search" role="search">
+      <input id="game-search" type="search" placeholder="SEARCH GAMES" autocomplete="off" aria-label="Search games">
+      <div id="game-search-results" class="game-search-results" hidden></div>
+    </div>
+    <nav class="navigation-links" aria-label="Main Navigation">
+      <a href="./index.html" class="navigation-link">HOME</a>
+      <a href="./index.html" class="navigation-link">DISCOVER</a>
+      <a href="#" class="navigation-link active">WORD BOMB</a>
+    </nav>
+    <div class="navigation-player" id="player-menu-button" role="button" tabindex="0" aria-label="Open account panel">
+      <span class="player-status"></span>
+      <span class="player-name" id="word-bomb-identity">GUEST</span>
+    </div>
   </header>
+
   <main class="word-bomb-shell">
-    <div class="word-bomb-heading"><div><span class="game-kicker">GAME #002 / LIVE BUILD</span><h1>WORD <span>BOMB</span></h1><p>Find the sequence. Keep the core alive.</p></div><a href="./index.html" class="game-home-button">← BACK TO GAMES</a></div>
-    <section class="word-bomb-layout">
-      <aside class="word-bomb-control glass-panel"><span class="game-kicker">MATCH CONTROL</span><h2>ENTER THE <span>ARENA</span></h2><p id="word-bomb-message" aria-live="polite">Build a streak or enter a live room.</p><div class="word-bomb-actions"><button id="word-bomb-quick" class="game-action-button">SOLO STREAK</button><button id="word-bomb-live" class="game-secondary-button">LIVE MATCH</button><button id="word-bomb-create" class="game-secondary-button">CREATE ROOM</button></div><label class="room-join">ROOM CODE<input id="word-bomb-code" maxlength="6" placeholder="ABC123" autocomplete="off"><button id="word-bomb-join" class="game-secondary-button" type="button">JOIN ROOM</button></label><div id="word-bomb-lobby" hidden><span class="game-kicker">PLAYERS</span><ul id="word-bomb-players"></ul><button id="word-bomb-start" class="game-action-button" hidden>START MATCH</button></div><div class="word-bomb-rules"><span>3 LIVES</span><span>20 SECOND TURNS</span><span>A–Z BONUS LIFE</span></div></aside>
-      <section class="word-bomb-arena glass-panel" id="word-bomb-arena"><div class="player-orbit" id="word-bomb-orbit"></div><div class="turn-arrow" id="word-bomb-turn-arrow" aria-hidden="true">➤</div><div class="bomb-core"><span class="bomb-label">ACTIVE SEQUENCE</span><strong id="word-bomb-sequence">—</strong><div class="bomb-timer"><span id="word-bomb-timer">20.0</span><small>SEC</small></div></div><div class="word-bomb-turn" id="word-bomb-turn">Choose a mode to begin.</div><form id="word-bomb-form" class="word-bomb-form"><input id="word-bomb-input" required minlength="3" autocomplete="off" placeholder="TYPE A WORD" aria-label="Word"><button class="game-action-button" type="submit">SUBMIT</button></form><div id="word-bomb-feed" class="word-bomb-feed" aria-live="polite"></div><aside class="used-words-panel"><span class="game-kicker">WORDS USED</span><ol id="word-bomb-used-words"></ol></aside></section>
+
+    <!-- ─────────────────────────────────────────────────────────────
+         SCREEN 1: LANDING PAGE & LOBBY BROWSER
+         ───────────────────────────────────────────────────────────── -->
+    <section id="screen-landing" class="wb-screen active">
+      <!-- HERO BANNER -->
+      <div class="wb-hero-banner glass-panel">
+        <img class="wb-hero-img" src="./assets/word-bomb-hero.jpg" alt="Word Bomb Hero Banner" onerror="this.style.display='none'">
+        <div class="wb-hero-overlay">
+          <span class="game-kicker">GAME #002 / LIVE MULTIPLAYER</span>
+          <h1 class="wb-hero-title">WORD <span>BOMB</span></h1>
+          <p class="wb-hero-subtitle">TYPE FAST. PASS THE CORE. SURVIVE THE BLAST.</p>
+        </div>
+      </div>
+
+      <!-- MATCH MODES -->
+      <div class="wb-landing-grid">
+        <!-- SOLO STREAK -->
+        <div class="wb-mode-card glass-panel">
+          <div class="mode-icon">⚡</div>
+          <h3>SOLO STREAK</h3>
+          <p>Race the 20-second clock alone. Build an unbroken word streak and test your vocabulary under fire.</p>
+          <div class="solo-high-score-badge">
+            <span>🏆 HIGH SCORE:</span> <strong id="solo-high-score-display">0 WORDS</strong>
+          </div>
+          <button id="word-bomb-quick" class="game-action-button" type="button">START SOLO STREAK ▶</button>
+        </div>
+
+        <!-- CREATE ROOM (PUBLIC VS PRIVATE TOGGLE) -->
+        <div class="wb-mode-card glass-panel">
+          <div class="mode-icon">➕</div>
+          <h3>CREATE ROOM</h3>
+          <p>Host a match for up to 6 players. Choose public to list in live lobbies or private for code-only.</p>
+          <div class="room-visibility-toggle">
+            <label class="toggle-label">ROOM VISIBILITY:</label>
+            <div class="toggle-switch-group">
+              <button id="toggle-public-btn" class="toggle-btn active" type="button" data-visibility="public">🌐 PUBLIC</button>
+              <button id="toggle-private-btn" class="toggle-btn" type="button" data-visibility="private">🔒 PRIVATE</button>
+            </div>
+          </div>
+          <button id="word-bomb-create" class="game-action-button" type="button">CREATE ROOM &amp; ENTER ▶</button>
+        </div>
+
+        <!-- JOIN PRIVATE ROOM WITH CODE -->
+        <div class="wb-mode-card glass-panel">
+          <div class="mode-icon">🔑</div>
+          <h3>JOIN BY CODE</h3>
+          <p>Enter a 6-character room code from a friend to join their private or public room.</p>
+          <div class="room-join-row">
+            <input id="word-bomb-code" maxlength="6" placeholder="ROOM CODE" autocomplete="off" aria-label="Room code">
+            <button id="word-bomb-join" class="game-secondary-button" type="button">JOIN ▶</button>
+          </div>
+          <div id="join-code-notice" class="join-code-notice" hidden style="display: none;"></div>
+        </div>
+      </div>
+
+      <!-- ACTIVE PUBLIC LOBBIES LIST (LIVE MATCHES) -->
+      <div class="wb-lobbies-section glass-panel">
+        <div class="lobbies-header">
+          <div>
+            <span class="game-kicker">LIVE MULTIPLAYER</span>
+            <h2>ACTIVE PUBLIC <span>LOBBIES</span></h2>
+            <p class="lobbies-desc">Open rooms waiting for players. Jump in and play live!</p>
+          </div>
+          <button id="lobbies-refresh-btn" class="game-secondary-button refresh-btn" type="button">🔄 REFRESH LOBBIES</button>
+        </div>
+
+        <div id="active-lobbies-container" class="active-lobbies-list">
+          <div class="lobbies-loading">Loading available lobbies...</div>
+        </div>
+        <div id="lobbies-notice" class="lobbies-notice" hidden style="display: none;"></div>
+      </div>
+
+      <!-- ARENA PROTOCOL / HOW TO PLAY (AFTER LIVE MULTIPLAYER) -->
+      <div class="wb-protocol-panel glass-panel">
+        <div class="wb-protocol-header">
+          <div class="protocol-title-group">
+            <span class="game-kicker">GAME PROTOCOL</span>
+            <h2 class="protocol-title">HOW TO <span>PLAY</span></h2>
+          </div>
+          <!-- Compact Rule Pills (Graceful 2x2 on Mobile, 1-Row on Desktop) -->
+          <div class="wb-rule-pills">
+            <span class="rule-pill"><span class="pill-dot">●</span> <strong>3 LIVES</strong> PER RUN</span>
+            <span class="rule-pill"><span class="pill-dot">●</span> <strong>20s</strong> RAPID TURNS</span>
+            <span class="rule-pill"><span class="pill-dot">●</span> <strong>2–6</strong> PLAYERS</span>
+            <span class="rule-pill"><span class="pill-dot">●</span> <strong>A–Z</strong> LIFE BONUS</span>
+          </div>
+        </div>
+
+        <div class="wb-protocol-grid">
+          <div class="protocol-card">
+            <div class="protocol-card-top">
+              <span class="protocol-step-num">STEP 01</span>
+              <span class="protocol-icon">💣</span>
+            </div>
+            <h3>THE SEQUENCE</h3>
+            <p>A random 2 to 5-letter prompt appears inside the ticking bomb core.</p>
+          </div>
+
+          <div class="protocol-card">
+            <div class="protocol-card-top">
+              <span class="protocol-step-num">STEP 02</span>
+              <span class="protocol-icon">⌨️</span>
+            </div>
+            <h3>TYPE &amp; DEFUSE</h3>
+            <p>Enter any dictionary word containing the sequence before the 20s fuse explodes.</p>
+          </div>
+
+          <div class="protocol-card">
+            <div class="protocol-card-top">
+              <span class="protocol-step-num">STEP 03</span>
+              <span class="protocol-icon">🏆</span>
+            </div>
+            <h3>PASS &amp; SURVIVE</h3>
+            <p>Turn passes clockwise. Miss a word and lose a life. Outlast rivals to claim victory!</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="word-bomb-message" class="wb-landing-feedback" aria-live="polite"></div>
     </section>
+
+    <!-- ─────────────────────────────────────────────────────────────
+         SCREEN 2: IN-GAME ARENA & IN-GAME LOBBY UI
+         ───────────────────────────────────────────────────────────── -->
+    <section id="screen-game" class="wb-screen" hidden>
+      <!-- TOP STATUS BAR -->
+      <div class="game-status-bar">
+        <button id="word-bomb-exit-btn" class="game-secondary-button exit-btn" type="button">← LEAVE ROOM</button>
+        <div class="game-status-info">
+          <span id="game-visibility-badge" class="visibility-badge">🌐 PUBLIC</span>
+          <span id="game-code-badge" class="room-badge" title="Click to copy code">ROOM: <strong id="game-room-code">—</strong></span>
+          <span id="game-players-badge" class="round-badge">1/6 PLAYERS</span>
+        </div>
+      </div>
+
+      <!-- GUEST RENAME BAR (IN LOBBY UNTIL GAME STARTS) -->
+      <div id="guest-rename-bar" class="guest-rename-bar" hidden style="display: none;">
+        <span>GUEST NAME:</span>
+        <div class="rename-input-wrap">
+          <input id="guest-rename-input" maxlength="15" placeholder="Enter custom name" autocomplete="off" aria-label="Guest name">
+          <button id="guest-rename-btn" class="game-secondary-button rename-btn" type="button">RENAME ✏️</button>
+        </div>
+      </div>
+
+      <!-- DEDICATED CIRCULAR ARENA (USERS & CENTER BOMB) -->
+      <div class="arena-circle-container glass-panel" id="word-bomb-arena">
+        <div class="player-orbit" id="word-bomb-orbit"></div>
+
+        <!-- CENTER BOMB WITH FIERY SPARK & REVOLVING NEEDLE -->
+        <div class="bomb-center" id="word-bomb-center">
+          <!-- Revolving Pointer Needle passing through Bomb -->
+          <div class="bomb-pointer-orbit" id="word-bomb-pointer-orbit" aria-hidden="true">
+            <div class="bomb-pointer-needle" id="word-bomb-pointer">
+              <div class="needle-head">▲</div>
+              <div class="needle-line"></div>
+            </div>
+          </div>
+
+          <!-- Fiery Bomb with burning fuse spark -->
+          <div class="bomb-visual-container" id="word-bomb-visual">
+            <div class="bomb-spark" id="word-bomb-spark" aria-hidden="true">
+              <span class="spark-core"></span>
+              <span class="spark-flare f1"></span>
+              <span class="spark-flare f2"></span>
+              <span class="spark-flare f3"></span>
+            </div>
+            <div class="bomb-emoji" id="word-bomb-emoji" aria-label="Bomb">
+              <svg class="custom-bomb-svg" viewBox="0 0 140 140" width="130" height="130" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <!-- 3D Bomb Body Sphere Radial Gradient -->
+                  <radialGradient id="wbBombBody3D" cx="36%" cy="34%" r="65%">
+                    <stop offset="0%" stop-color="#324154" />
+                    <stop offset="28%" stop-color="#19222c" />
+                    <stop offset="68%" stop-color="#0b1017" />
+                    <stop offset="100%" stop-color="#030609" />
+                  </radialGradient>
+
+                  <!-- Curved Specular Gloss Reflection -->
+                  <radialGradient id="wbBombGloss" cx="30%" cy="26%" r="38%">
+                    <stop offset="0%" stop-color="#ffffff" stop-opacity="0.45" />
+                    <stop offset="40%" stop-color="#38bdf8" stop-opacity="0.12" />
+                    <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+                  </radialGradient>
+
+                  <!-- Metallic Collar Nozzle Gradient -->
+                  <linearGradient id="wbBombCollar" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#1e293b" />
+                    <stop offset="25%" stop-color="#64748b" />
+                    <stop offset="50%" stop-color="#cbd5e1" />
+                    <stop offset="75%" stop-color="#475569" />
+                    <stop offset="100%" stop-color="#0f172a" />
+                  </linearGradient>
+
+                  <!-- Fuse Cord Gradient -->
+                  <linearGradient id="wbBombFuse" x1="0%" y1="100%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#784e2d" />
+                    <stop offset="50%" stop-color="#d4a373" />
+                    <stop offset="100%" stop-color="#fed7aa" />
+                  </linearGradient>
+
+                  <!-- Dynamic Core Energy Glow -->
+                  <radialGradient id="wbBombCoreRadial" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="var(--bomb-core-color, #00e5ff)" stop-opacity="0.95" />
+                    <stop offset="50%" stop-color="var(--bomb-core-color, #00e5ff)" stop-opacity="0.45" />
+                    <stop offset="100%" stop-color="var(--bomb-core-color, #00e5ff)" stop-opacity="0" />
+                  </radialGradient>
+                </defs>
+
+                <!-- Ground Ambient Shadow -->
+                <ellipse cx="70" cy="133" rx="42" ry="6.5" fill="rgba(0, 0, 0, 0.55)" class="bomb-ground-shadow" />
+
+                <!-- Ambient Outer Pulse Aura -->
+                <circle class="bomb-pulse-aura" cx="70" cy="80" r="49" fill="none" stroke="var(--bomb-core-color, #00e5ff)" stroke-width="1.5" stroke-dasharray="4 6" opacity="0.4" />
+
+                <!-- Curved Braided Fuse Cord -->
+                <path class="bomb-fuse-line" d="M 70 28 C 70 14, 86 18, 98 11" fill="none" stroke="url(#wbBombFuse)" stroke-width="4.5" stroke-linecap="round" />
+
+                <!-- Top Collar / Metal Cap -->
+                <rect x="62" y="27" width="16" height="8.5" rx="2.5" fill="url(#wbBombCollar)" stroke="#334155" stroke-width="0.8" />
+                <ellipse cx="70" cy="27" rx="8.5" ry="3.2" fill="#64748b" stroke="#94a3b8" stroke-width="0.6" />
+
+                <!-- Bomb Spherical Body -->
+                <circle class="bomb-sphere" cx="70" cy="80" r="45" fill="url(#wbBombBody3D)" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1.2" />
+
+                <!-- Specular Gloss Arc -->
+                <ellipse cx="55" cy="60" rx="20" ry="12" transform="rotate(-30 55 60)" fill="url(#wbBombGloss)" />
+
+                <!-- Futuristic Reactor Energy Core -->
+                <g class="bomb-reactor-group">
+                  <!-- Outer Housing Rim -->
+                  <circle cx="70" cy="80" r="18" fill="#030712" stroke="rgba(255, 255, 255, 0.16)" stroke-width="1.2" />
+                  <!-- Rotating Segmented Tactical Ring -->
+                  <circle class="bomb-reactor-ring" cx="70" cy="80" r="14" fill="none" stroke="var(--bomb-core-color, #00e5ff)" stroke-width="2.2" stroke-dasharray="7 5" />
+                  <!-- Pulsing Plasma Core Glow -->
+                  <circle class="bomb-reactor-glow" cx="70" cy="80" r="9" fill="url(#wbBombCoreRadial)" />
+                  <!-- Intense Core Center Dot -->
+                  <circle class="bomb-reactor-dot" cx="70" cy="80" r="3.5" fill="#ffffff" />
+                </g>
+
+                <!-- Shockwave Wave expanding outward during blast -->
+                <circle class="bomb-blast-wave" cx="70" cy="80" r="12" fill="none" stroke="#ff3b30" stroke-width="3" opacity="0" />
+              </svg>
+            </div>
+          </div>
+
+          <!-- Active sequence or Lobby Status -->
+          <strong class="bomb-sequence" id="word-bomb-sequence">—</strong>
+
+          <!-- Solo timer (hidden in multiplayer) -->
+          <div class="bomb-timer-wrap" id="word-bomb-timer-wrap">
+            <span id="word-bomb-timer">20.0</span><small>s</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTTOMMOST CONTROLS (ALWAYS UNDER ARENA) -->
+      <div class="game-bottom-panel glass-panel">
+        <div class="word-bomb-turn" id="word-bomb-turn">WAITING IN LOBBY...</div>
+
+        <!-- COMPACT A–Z ALPHABET TRACKER (INTEGRATED IN MAIN GAME PANEL) -->
+        <div class="game-alphabet-strip" id="word-bomb-alphabet-grid" aria-label="A to Z Alphabet Tracker">
+          <span class="alpha-chip" data-letter="a">A</span>
+          <span class="alpha-chip" data-letter="b">B</span>
+          <span class="alpha-chip" data-letter="c">C</span>
+          <span class="alpha-chip" data-letter="d">D</span>
+          <span class="alpha-chip" data-letter="e">E</span>
+          <span class="alpha-chip" data-letter="f">F</span>
+          <span class="alpha-chip" data-letter="g">G</span>
+          <span class="alpha-chip" data-letter="h">H</span>
+          <span class="alpha-chip" data-letter="i">I</span>
+          <span class="alpha-chip" data-letter="j">J</span>
+          <span class="alpha-chip" data-letter="k">K</span>
+          <span class="alpha-chip" data-letter="l">L</span>
+          <span class="alpha-chip" data-letter="m">M</span>
+          <span class="alpha-chip" data-letter="n">N</span>
+          <span class="alpha-chip" data-letter="o">O</span>
+          <span class="alpha-chip" data-letter="p">P</span>
+          <span class="alpha-chip" data-letter="q">Q</span>
+          <span class="alpha-chip" data-letter="r">R</span>
+          <span class="alpha-chip" data-letter="s">S</span>
+          <span class="alpha-chip" data-letter="t">T</span>
+          <span class="alpha-chip" data-letter="u">U</span>
+          <span class="alpha-chip" data-letter="v">V</span>
+          <span class="alpha-chip" data-letter="w">W</span>
+          <span class="alpha-chip" data-letter="x">X</span>
+          <span class="alpha-chip" data-letter="y">Y</span>
+          <span class="alpha-chip" data-letter="z">Z</span>
+        </div>
+
+        <!-- HOST START MATCH CONTROLS (VISIBLE ONLY IN LOBBY) -->
+        <div id="lobby-host-controls" class="lobby-host-controls" hidden style="display: none;">
+          <button id="word-bomb-host-start" class="game-action-button start-btn" type="button">START GAME ▶</button>
+          <p id="lobby-host-hint" class="lobby-host-hint">Need at least 2 players to begin.</p>
+        </div>
+
+        <!-- IN-GAME WORD SUBMISSION FORM (ACTIVE MATCH ONLY) -->
+        <form id="word-bomb-form" class="word-bomb-form" hidden style="display: none;">
+          <input id="word-bomb-input" required minlength="3" autocomplete="off" placeholder="TYPE A WORD CONTAINING SEQUENCE" aria-label="Word">
+          <button class="game-action-button" type="submit">SUBMIT</button>
+        </form>
+
+        <div id="word-bomb-feed" class="word-bomb-feed" aria-live="polite"></div>
+      </div>
+
+      <!-- Hidden words used (retained in DOM for accessibility) -->
+      <aside class="used-words-panel" id="word-bomb-used-words-panel" hidden style="display: none;">
+        <ol id="word-bomb-used-words"></ol>
+      </aside>
+    </section>
+
   </main>
-  <script src="./js/word-bomb.js?v=email-otp-20260915-4"></script>
+
+  <!-- ─────────────────────────────────────────────────────────────
+       MATCH OVER POPUP MODAL
+       ───────────────────────────────────────────────────────────── -->
+  <div id="word-bomb-modal" class="wb-modal" hidden style="display: none;">
+    <div class="wb-modal-backdrop"></div>
+    <div class="wb-modal-card glass-panel">
+      <div class="modal-header">
+        <span class="modal-emoji" id="modal-emoji">🏆</span>
+        <h2 id="modal-title">ARENA CONCLUDED</h2>
+        <p id="modal-subtitle" class="modal-sub">Winner crowned in the arena.</p>
+      </div>
+
+      <!-- User-Specific XP & Reward Highlight -->
+      <div class="modal-reward-card" id="modal-reward-box">
+        <div id="modal-solo-score" class="modal-solo-score" hidden style="display: none;">Score: 0</div>
+        <div class="reward-xp-pill" id="modal-reward-header"><span id="modal-xp-val">+0 XP</span> <span id="modal-reward-status">EARNED</span></div>
+        <div class="reward-total" id="modal-total-xp">PLAYER TOTAL: —</div>
+      </div>
+
+      <!-- Standings list with current user highlight and rankings -->
+      <div class="modal-standings-box" id="modal-standings-box">
+        <h4>MATCH RESULTS</h4>
+        <ul id="modal-standings-list" class="modal-standings"></ul>
+      </div>
+
+      <!-- Modal Actions -->
+      <div class="modal-actions">
+        <button id="modal-play-again" class="game-action-button" type="button">REPLAY ROOM 🔁</button>
+        <button id="modal-close" class="game-secondary-button" type="button">MAIN MENU 🏠</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./js/word-bomb.js?v=email-otp-20260915-8"></script>
 </body>
 </html>
