@@ -27,14 +27,14 @@ function attachHostedGames(io, ready) {
         const actor = { key, id: guest ? `guest:${key}` : socket.user.id,
             userId: guest ? null : socket.user.id,
             username: guest ? `Guest${key.slice(0, 8)}` : socket.user.username, isGuest: guest };
-        socket.emit("word-bomb:identity", { id: actor.id, isGuest: guest });
+
         let stopped = false, timer, seenRoom, cursor = 0, fingerprint, heartbeat = 0;
         // Serialize actions and polling for this connection. Different instances
         // coordinate through MongoDB transactions, not through this local chain.
         let pending = Promise.resolve();
         const enqueue = task => {
             pending = pending.then(async () => { if (!stopped) await task(); }).catch(() => {
-                if (!stopped) socket.emit("word-bomb:error", { message: "Game service temporarily unavailable. Please retry." });
+                if (!stopped) socket.emit("tic-tac-toe:error", { message: "Game service temporarily unavailable. Please retry." });
             });
         };
         const checkSession = () => new Promise(resolve => {
@@ -56,7 +56,7 @@ function attachHostedGames(io, ready) {
             }
             const result = await games.read(actor);
             if (result.timeout === "tic-tac-toe") socket.emit("tic-tac-toe:matchmaking-timeout");
-            if (result.timeout === "word-bomb") socket.emit("word-bomb:error", { message: "No player joined. Try live play again." });
+
             const room = result.room;
             if (!room) { seenRoom = null; fingerprint = null; return; }
             const state = publicRoom(room);
@@ -67,10 +67,11 @@ function attachHostedGames(io, ready) {
                     socket.emit("tic-tac-toe:matched", { match: state, ownSymbol: player.symbol,
                         opponentUsername: room.players.find(p => p.key !== key)?.username });
                 }
+
             }
             const nextFingerprint = JSON.stringify(state);
             if (fingerprint !== nextFingerprint) {
-                socket.emit(`${room.game}:state`, room.game === "word-bomb" ? { room: state } : { match: state });
+                socket.emit(`${room.game}:state`, { match: state });
                 fingerprint = nextFingerprint;
             }
             for (const item of room.events) {
@@ -84,12 +85,12 @@ function attachHostedGames(io, ready) {
                 if (!await checkSession()) return;
                 await games.touch(actor);
                 const result = await games.act(actor, name, payload && typeof payload === "object" ? payload : {});
-                if (result.queued) socket.emit(result.game === "tic-tac-toe" ? "tic-tac-toe:queue-status" : "word-bomb:queue", { status: "searching", timeoutMs: 8000 });
-                if (result.invalid) socket.emit("word-bomb:invalid", { message: "That word is not accepted for this sequence." });
-                if (result.created || result.solo) {
-                    const { room } = await games.read(actor);
-                    if (room) socket.emit(result.created ? "word-bomb:room-created" : "word-bomb:solo-started", { room: publicRoom(room) });
-                }
+                if (result.queued) socket.emit("tic-tac-toe:queue-status", { status: "searching", timeoutMs: 8000 });
+
+
+
+
+
                 await sync();
             } catch (error) {
                 // Database errors can contain connection information; expose only
