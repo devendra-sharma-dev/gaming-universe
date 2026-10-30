@@ -7,11 +7,12 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 300,
-      "includeFiles": "Dictionary.txt"
+      "includeFiles": "{Dictionary.txt,data/**}"
     }
   },
   "rewrites": [
     { "source": "/api/v1/:path*", "destination": "/api/index" },
+    { "source": "/socket.io", "destination": "/api/index" },
     { "source": "/socket.io/:path*", "destination": "/api/index" }
   ]
 }

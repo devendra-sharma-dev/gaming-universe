@@ -62,7 +62,7 @@ const createGameServer = ({ shared = Boolean(process.env.VERCEL) } = {}) => {
 
     const io = new Server(httpServer, {
         cors: {
-            origin: [...allowedOrigins],
+            origin: (origin, callback) => callback(null, isAllowedOrigin(origin)),
             credentials: true
         },
         maxHttpBufferSize: 16384,
@@ -126,10 +126,11 @@ const createGameServer = ({ shared = Boolean(process.env.VERCEL) } = {}) => {
         }
     });
 
+    attachWordBomb(io);
     if (shared) initializeGames = attachHostedGames(io, ready);
     else {
         attachTicTacToe(io);
-        attachWordBomb(io);
+
     }
 
     return { httpServer, io, ready };

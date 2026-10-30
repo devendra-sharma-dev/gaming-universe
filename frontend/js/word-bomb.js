@@ -9,7 +9,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const host = window.location.hostname === "[::]" ? "[::]" : window.location.hostname || "localhost";
     const apiOrigin = window.GamingSession.apiOrigin;
-    const socket = window.io(apiOrigin, { transports: ["websocket"], withCredentials: true, auth: window.GamingSession.socketAuth });
+    const socket = window.io(apiOrigin, {
+        transports: ["polling", "websocket"],
+        upgrade: true,
+        withCredentials: true,
+        auth: window.GamingSession.socketAuth
+    });
 
     const $ = (id) => document.getElementById(id);
 

@@ -3,9 +3,9 @@
 const crypto = require("node:crypto");
 const { createSharedGames, publicRoom } = require("./sharedGames");
 
-const actions = ["tic-tac-toe:queue", "tic-tac-toe:cancel", "tic-tac-toe:move",
-    "word-bomb:quick-play", "word-bomb:solo-start", "word-bomb:create-room",
-    "word-bomb:join-room", "word-bomb:start-room", "word-bomb:submit", "word-bomb:leave"];
+const actions = ["tic-tac-toe:queue", "tic-tac-toe:cancel", "tic-tac-toe:move"];
+
+
 
 function attachHostedGames(io, ready) {
     let games;
