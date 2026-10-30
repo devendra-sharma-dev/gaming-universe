@@ -58,7 +58,37 @@ router.get("/registry", (_request, response) => {
     response.json({ success: true, data: { games } });
 });
 
+router.get("/word-bomb/validate", (request, response) => {
+    const word = String(request.query?.word || "").trim().toLowerCase();
+    const { hasWord } = require("../services/wordnikDictionary");
+    const valid = /^[a-z]{3,64}$/.test(word) && hasWord(word);
+    response.json({ success: true, valid, word });
+});
+
 router.use(requireAuth);
+
+router.post(
+    "/word-bomb/award-xp",
+    asyncRoute(async (request, response) => {
+        const xpEarned = parseInt(request.body?.xpEarned, 10) || 0;
+        if (xpEarned <= 0) {
+            return response.json({
+                success: true,
+                data: { xpEarned: 0, totalXp: request.user.xp }
+            });
+        }
+        const validXp = Math.min(xpEarned, 1000);
+        const user = await User.findByIdAndUpdate(
+            request.user._id,
+            { $inc: { xp: validXp } },
+            { new: true }
+        ).select("xp username");
+        response.json({
+            success: true,
+            data: { xpEarned: validXp, totalXp: user ? user.xp : (request.user.xp + validXp) }
+        });
+    })
+);
 
 router.post(
     "/cricket/award-xp",

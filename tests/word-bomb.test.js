@@ -290,4 +290,14 @@ assert(v12Css.includes(".round-badge[hidden]"), "CSS must enforce display: none 
 
 console.log("  ✓ Solo badges hiding, full lobby notice restriction, and substring scaling verified.");
 
+// 13. Testing Header Account Popup and Identity Controller
+console.log("13. Testing Header Account Popup and Identity Controller...");
+assert(v12Html.includes('id="auth-overlay"'), "word-bomb.html must include auth-overlay modal");
+assert(v12Html.includes('id="player-menu-button"'), "word-bomb.html must include player-menu-button");
+assert(v12Js.includes('playerMenuBtn?.addEventListener("click"'), "word-bomb.js must bind click listener to player-menu-button");
+assert(v12Js.includes('openAuth("account")'), "word-bomb.js must support openAuth for account profile");
+assert(v12Js.includes('openAuth("login")'), "word-bomb.js must support openAuth for login");
+assert(v12Js.includes('data-auth-logout'), "word-bomb.js must support logout from auth popup");
+console.log("  ✓ Header account popup, profile view, and identity controller verified.");
+
 console.log("\nAll Word Bomb Unit Tests PASSED! 💣✓");
