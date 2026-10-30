@@ -7,4 +7,15 @@ const allowedOrigins = new Set([
     ...(process.env.NODE_ENV !== "production" ? ["http://localhost:3000", "http://127.0.0.1:3000", "http://[::]:3000"] : [])
 ].filter(Boolean));
 
-module.exports = { allowedOrigins, isAllowedOrigin: origin => !origin || allowedOrigins.has(origin) };
+const isAllowedOrigin = (origin) => {
+    if (!origin) return true;
+    if (allowedOrigins.has(origin)) return true;
+    try {
+        const parsed = new URL(origin);
+        if (parsed.hostname.endsWith(".vercel.app")) return true;
+        if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") return true;
+    } catch {}
+    return false;
+};
+
+module.exports = { allowedOrigins, isAllowedOrigin };

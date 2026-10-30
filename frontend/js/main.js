@@ -747,7 +747,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (!socket) {
             socket = window.io(API_ORIGIN, {
-                transports: ["websocket"],
+                transports: ["polling", "websocket"],
+                upgrade: true,
                 withCredentials: true,
                 autoConnect: false,
                 auth: window.GamingSession.socketAuth
