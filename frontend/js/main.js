@@ -272,7 +272,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 navEl.hidden = false;
                 navEl.innerHTML = `
                     <div class="auth-nav-row">
-                        <button type="button" class="auth-nav-link" data-auth-switch="signup">USE ANOTHER EMAIL</button>
                         <button type="button" class="auth-nav-link secondary" data-auth-switch="login">BACK TO SIGN IN</button>
                     </div>
                 `;
