@@ -4,7 +4,7 @@
    ========================================================= */
 
 .estimate-page{min-height:100vh;color:#fff;background:radial-gradient(circle at 25% 12%,rgba(0,200,255,.14),transparent 35%),#02070d}
-.estimate-page .main-navigation{position:fixed;z-index:5;top:0;left:50%}
+
 
 /* ── Screen Red Boundary Alert (Under 10s) ────────────────── */
 
