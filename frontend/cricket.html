@@ -93,27 +93,39 @@ const ctx = canvas.getContext('2d');
 canvas.width = W; canvas.height = H;
 
 /**
- * 8 International Teams with Realistic Relative Strengths:
- * Tier 1 (Elite): India (96), Australia (95) -> Sets highest targets, high pace
- * Tier 2 (Strong): England (89), South Africa (87), New Zealand (85) -> Strong targets
- * Tier 3 (Challengers): Pakistan (79), West Indies (75), Sri Lanka (72) -> Lower targets
+ * 16 International Teams based on ICC T20I Rankings (2024-25):
+ * Tier 1 (Elite):      India (96), Australia (95)
+ * Tier 2 (Strong):     England (89), South Africa (87), New Zealand (85)
+ * Tier 3 (Competitive): Pakistan (79), West Indies (75), Sri Lanka (72)
+ * Tier 4 (Emerging):   Bangladesh (68), Afghanistan (65), Ireland (60), Zimbabwe (55),
+ *                      Netherlands (52), Scotland (48), Nepal (45), Namibia (42)
  */
 const TEAMS = [
-    { name:'India',        code:'IND', primary:'#0066CC', secondary:'#FF9933', rating:96, stars:'★★★★★', tier:'Elite Tier 1',      tag:'Highest Targets · Formidable All-Rounders', targetMod:6,  speedMod:0.07, swingMod:3 },
-    { name:'Australia',    code:'AUS', primary:'#FFCD00', secondary:'#006847', rating:95, stars:'★★★★★', tier:'Elite Tier 1',      tag:'Highest Targets · Lethal Pace Attack',      targetMod:5,  speedMod:0.08, swingMod:4 },
-    { name:'England',      code:'ENG', primary:'#CF142B', secondary:'#00247D', rating:89, stars:'★★★★☆', tier:'Strong Tier 2',     tag:'Strong Targets · Aggressive Strokeplay',    targetMod:3,  speedMod:0.04, swingMod:2 },
-    { name:'South Africa', code:'RSA', primary:'#007749', secondary:'#FFB81C', rating:87, stars:'★★★★☆', tier:'Strong Tier 2',     tag:'Competitive Targets · Express Fast Bowling', targetMod:2, speedMod:0.05, swingMod:2 },
-    { name:'New Zealand',  code:'NZL', primary:'#1a1a1a', secondary:'#FFFFFF', rating:85, stars:'★★★★☆', tier:'Strong Tier 2',     tag:'Disciplined Targets · Precision Swing',     targetMod:1,  speedMod:0.02, swingMod:3 },
-    { name:'Pakistan',     code:'PAK', primary:'#00882B', secondary:'#FFFFFF', rating:79, stars:'★★★☆☆', tier:'Moderate Tier 3',   tag:'Moderate Targets · Reverse Swing & Pace',   targetMod:-2, speedMod:0.03, swingMod:5 },
-    { name:'West Indies',  code:'WIN', primary:'#7B2D26', secondary:'#FFC72C', rating:75, stars:'★★★☆☆', tier:'Moderate Tier 3',   tag:'Moderate Targets · Power Hitters',          targetMod:-4, speedMod:-0.02, swingMod:-2 },
-    { name:'Sri Lanka',    code:'SLK', primary:'#0033A0', secondary:'#FFB81C', rating:72, stars:'★★★☆☆', tier:'Lower Tier 3',      tag:'Lower Targets · Rebuilding Unit & Spin',    targetMod:-6, speedMod:-0.04, swingMod:1 },
+    { name:'India',        code:'IND', primary:'#1C4FA0', secondary:'#FF8C00', rating:96, stars:'★★★★★', tier:'Elite Tier 1',        tag:'Highest Targets · Formidable All-Rounders',   targetMod:6,  speedMod:0.07, swingMod:3 },
+    { name:'Australia',    code:'AUS', primary:'#154734', secondary:'#F5D000', rating:95, stars:'★★★★★', tier:'Elite Tier 1',        tag:'Highest Targets · Lethal Pace Attack',        targetMod:5,  speedMod:0.08, swingMod:4 },
+    { name:'England',      code:'ENG', primary:'#CF142B', secondary:'#1B2A4A', rating:89, stars:'★★★★☆', tier:'Strong Tier 2',       tag:'Strong Targets · Aggressive Strokeplay',      targetMod:3,  speedMod:0.04, swingMod:2 },
+    { name:'South Africa', code:'RSA', primary:'#F5D000', secondary:'#007A3D', rating:87, stars:'★★★★☆', tier:'Strong Tier 2',       tag:'Competitive Targets · Express Fast Bowling',  targetMod:2,  speedMod:0.05, swingMod:2 },
+    { name:'New Zealand',  code:'NZL', primary:'#1a1a1a', secondary:'#45B5AA', rating:85, stars:'★★★★☆', tier:'Strong Tier 2',       tag:'Disciplined Targets · Precision Swing',       targetMod:1,  speedMod:0.02, swingMod:3 },
+    { name:'Pakistan',     code:'PAK', primary:'#0A5C36', secondary:'#5DB86A', rating:79, stars:'★★★☆☆', tier:'Competitive Tier 3',  tag:'Moderate Targets · Reverse Swing & Pace',     targetMod:-2, speedMod:0.03, swingMod:5 },
+    { name:'West Indies',  code:'WIN', primary:'#6B1D2A', secondary:'#FFC72C', rating:75, stars:'★★★☆☆', tier:'Competitive Tier 3',  tag:'Moderate Targets · Power Hitters',            targetMod:-4, speedMod:-0.02, swingMod:-2 },
+    { name:'Sri Lanka',    code:'SLK', primary:'#FFD700', secondary:'#00247D', rating:72, stars:'★★★☆☆', tier:'Competitive Tier 3',  tag:'Lower Targets · Rebuilding Unit & Spin',      targetMod:-6, speedMod:-0.04, swingMod:1 },
+    { name:'Bangladesh',   code:'BAN', primary:'#00573F', secondary:'#E8292A', rating:68, stars:'★★☆☆☆', tier:'Emerging Tier 4',     tag:'Moderate Targets · Spin & Pace Mix',          targetMod:-7, speedMod:-0.05, swingMod:0 },
+    { name:'Afghanistan',  code:'AFG', primary:'#1E56A0', secondary:'#D21034', rating:65, stars:'★★☆☆☆', tier:'Emerging Tier 4',     tag:'Lower Targets · Mystery Spin Attack',         targetMod:-8, speedMod:-0.06, swingMod:2 },
+    { name:'Ireland',      code:'IRE', primary:'#009A49', secondary:'#16214A', rating:60, stars:'★★☆☆☆', tier:'Emerging Tier 4',     tag:'Lower Targets · Medium Pace & Seam',          targetMod:-9, speedMod:-0.07, swingMod:3 },
+    { name:'Zimbabwe',     code:'ZIM', primary:'#EFD81D', secondary:'#DE3831', rating:55, stars:'★☆☆☆☆', tier:'Emerging Tier 4',     tag:'Lower Targets · Pace & Spin',                 targetMod:-10, speedMod:-0.08, swingMod:1 },
+    { name:'Netherlands',  code:'NED', primary:'#FF6600', secondary:'#FFFFFF', rating:52, stars:'★☆☆☆☆', tier:'Associate Tier 5',    tag:'Lowest Targets · Emerging Cricket',            targetMod:-11, speedMod:-0.09, swingMod:0 },
+    { name:'Scotland',     code:'SCO', primary:'#2A2477', secondary:'#FFFFFF', rating:48, stars:'★☆☆☆☆', tier:'Associate Tier 5',    tag:'Lowest Targets · Swing Bowling',              targetMod:-12, speedMod:-0.10, swingMod:4 },
+    { name:'Nepal',        code:'NEP', primary:'#1C3C6B', secondary:'#DC143C', rating:45, stars:'★☆☆☆☆', tier:'Associate Tier 5',    tag:'Lowest Targets · Spin Specialists',           targetMod:-13, speedMod:-0.10, swingMod:1 },
+    { name:'Namibia',      code:'NAM', primary:'#1A1F36', secondary:'#D21034', rating:42, stars:'★☆☆☆☆', tier:'Associate Tier 5',    tag:'Lowest Targets · Rising Cricket',             targetMod:-14, speedMod:-0.10, swingMod:0 },
 ];
 
-/* Progressive difficulty definitions */
+/* Progressive difficulty definitions — 4 rounds (Round of 16 → QF → SF → Final) */
+/* All difficulty bumped up 1 notch from original */
 const DIFF = [
-    { name:'Quarter-Final', speed:0.80, swing:14, label:'Predictable medium pace' },
-    { name:'Semi-Final',    speed:0.98, swing:24, label:'Pace with subtle swing' },
-    { name:'Grand Final',   speed:1.18, swing:36, label:'Aggressive pace & late swing' },
+    { name:'Round of 16',   speed:0.88, swing:18, label:'Sharp medium pace' },
+    { name:'Quarter-Final', speed:1.02, swing:28, label:'Aggressive pace & movement' },
+    { name:'Semi-Final',    speed:1.16, swing:38, label:'High pace with late swing' },
+    { name:'Grand Final',   speed:1.32, swing:48, label:'Express pace & vicious swing' },
 ];
 
 /* Timing windows in milliseconds */
@@ -218,9 +230,10 @@ function randInt(a, b) {
 
 function generateBaseTarget(mode, round) {
     if (mode === 'tournament') {
-        if (round === 0) return randInt(25, 31);
-        if (round === 1) return randInt(36, 42);
-        return randInt(46, 52);
+        if (round === 0) return randInt(24, 30);   // Round of 16
+        if (round === 1) return randInt(28, 35);   // Quarter-Final
+        if (round === 2) return randInt(36, 42);   // Semi-Final
+        return randInt(46, 52);                     // Grand Final
     }
     const roll = Math.random();
     if (roll < 0.80) {
@@ -238,9 +251,10 @@ function calculateTarget(playerTeam, opponentTeam, mode, round) {
     let target = base + oppMod;
 
     if (mode === 'tournament') {
-        if (round === 0) target = clamp(target, 20, 36);
-        else if (round === 1) target = clamp(target, 30, 48);
-        else target = clamp(target, 42, 58);
+        if (round === 0) target = clamp(target, 18, 34);       // Round of 16
+        else if (round === 1) target = clamp(target, 22, 40);  // Quarter-Final
+        else if (round === 2) target = clamp(target, 30, 48);  // Semi-Final
+        else target = clamp(target, 42, 58);                    // Grand Final
     } else {
         target = clamp(target, 24, 56);
     }
@@ -289,6 +303,7 @@ const G = {
     pitchPt: 0.52,
     pitchRings: [],
     ballActive: false,
+    swingType: 'straight',  // 'inswing', 'outswing', or 'straight'
     deliveryStart: 0,
     idealSwingTime: 0,
     resultProcessed: false,
@@ -343,8 +358,8 @@ function resetInnings() {
 
 let buttons = [];
 function clearBtns() { buttons = []; }
-function addBtn(x, y, w, h, text, cb, color, subtext) {
-    buttons.push({ x, y, w, h, text, cb, color: color || null, subtext: subtext || null });
+function addBtn(x, y, w, h, text, cb, color, subtext, strokeColor) {
+    buttons.push({ x, y, w, h, text, cb, color: color || null, subtext: subtext || null, strokeColor: strokeColor || null });
 }
 
 function roundRect(x, y, w, h, r) {
@@ -359,13 +374,29 @@ function roundRect(x, y, w, h, r) {
 
 function drawBtn(b) {
     const fill = b.color ? b.color : 'rgba(255,255,255,0.08)';
-    const stroke = b.color ? b.color : 'rgba(0,210,255,0.4)';
+    let stroke = b.strokeColor || (b.color ? b.color : 'rgba(0,210,255,0.4)');
+    
+    // Ensure high contrast against the dark background (#061022 - #0b1b38)
+    // Dark teams like New Zealand (#1a1a1a) or Namibia (#1A1F36) get a crisp, visible border
+    if (!b.strokeColor && b.color) {
+        const hex = b.color.replace('#', '');
+        if (hex.length === 6) {
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const bVal = parseInt(hex.substring(4, 6), 16);
+            const lum = (0.2126 * r + 0.7152 * g + 0.0722 * bVal) / 255;
+            if (lum < 0.22) {
+                stroke = 'rgba(255, 255, 255, 0.45)';
+            }
+        }
+    }
+
     ctx.fillStyle = fill;
     ctx.globalAlpha = b.color ? 0.35 : 1;
     roundRect(b.x, b.y, b.w, b.h, 12); ctx.fill();
     ctx.globalAlpha = 1;
     ctx.strokeStyle = stroke;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.6;
     roundRect(b.x, b.y, b.w, b.h, 12); ctx.stroke();
 
     if (b.subtext) {
@@ -2022,7 +2053,7 @@ function drawMatchResultScreen() {
     ctx.fillStyle = isTie ? 'rgba(255,215,0,0.1)' : (won ? 'rgba(0,210,120,0.08)' : 'rgba(220,0,0,0.08)');
     ctx.fillRect(0, 0, W, H);
 
-    const isFinalWin = won && G.mode === 'tournament' && G.round >= 2;
+    const isFinalWin = won && G.mode === 'tournament' && G.round >= 3;
 
     if (isFinalWin) {
         ctx.fillStyle = '#FFD700'; ctx.font = '48px serif'; ctx.textAlign = 'center';
@@ -2217,7 +2248,7 @@ function setupMatch() {
         G.difficulty = G.round;
         G.opponentTeam = G.tournamentOpponents[G.round];
     } else {
-        G.difficulty = 1;
+        G.difficulty = 2;  // Quick Match uses Semi-Final level difficulty
     }
     G.target = calculateTarget(G.playerTeam, G.opponentTeam, G.mode, G.round);
     resetInnings();
@@ -2247,8 +2278,28 @@ function setupSuperOver() {
 function setupTournament() {
     G.round = 0;
     const avail = TEAMS.filter(t => t !== G.playerTeam);
-    shuffle(avail);
-    G.tournamentOpponents = avail.slice(0, 3);
+
+    // Sort by rating descending to pick top 3 auto-qualified teams
+    const sorted = [...avail].sort((a, b) => b.rating - a.rating);
+    const autoQualified = sorted.slice(0, 3); // Top 3 rated teams auto-qualify
+
+    // Remaining teams available for Round of 16 opponent
+    const remaining = avail.filter(t => !autoQualified.includes(t));
+    shuffle(remaining);
+
+    // Round of 16 opponent is picked from remaining (non-top-3) teams
+    const r16Opponent = remaining[0];
+
+    // QF, SF opponents are from the autoQualified pool (shuffled)
+    shuffle(autoQualified);
+
+    // Final opponent is the strongest remaining auto-qualified team
+    G.tournamentOpponents = [
+        r16Opponent,        // Round 0: Round of 16
+        autoQualified[0],   // Round 1: Quarter-Final
+        autoQualified[1],   // Round 2: Semi-Final
+        autoQualified[2],   // Round 3: Grand Final
+    ];
     setupMatch();
 }
 
@@ -2279,7 +2330,26 @@ function startNewBall() {
     const swingMod = opp.swingMod || 0;
 
     G.ballLine = (Math.random() - 0.5) * (0.55 + G.difficulty * 0.18);
-    G.ballSwing = (Math.random() - 0.5) * (d.swing + swingMod);
+
+    // Inswing / Outswing mechanics
+    // Inswing: moves from off-side to leg-side (right to left for RH batsman)
+    // Outswing: moves from leg-side to off-side (left to right for RH batsman)
+    const swingAmount = (d.swing + swingMod) * (0.6 + Math.random() * 0.4);
+    const swingRoll = Math.random();
+    if (swingRoll < 0.38) {
+        // Inswing
+        G.swingType = 'inswing';
+        G.ballSwing = -Math.abs(swingAmount) * (0.7 + Math.random() * 0.3);
+    } else if (swingRoll < 0.76) {
+        // Outswing
+        G.swingType = 'outswing';
+        G.ballSwing = Math.abs(swingAmount) * (0.7 + Math.random() * 0.3);
+    } else {
+        // Straight / seam — minimal lateral movement
+        G.swingType = 'straight';
+        G.ballSwing = (Math.random() - 0.5) * swingAmount * 0.3;
+    }
+
     G.ballSpeed = d.speed + speedMod + (Math.random() - 0.5) * 0.08;
 
     const lenRoll = Math.random();
@@ -2503,17 +2573,16 @@ function calculateAndAwardMatchXp() {
         baseXp = 70;
         label = G.isSuperOver ? 'Super Over Win' : 'Quick Match Win';
     } else if (G.mode === 'tournament') {
-        if (G.round >= 2) {
+        if (G.round >= 3) {
+            // Grand Final Win = 500 XP
             baseXp = 500;
             label = G.isSuperOver ? 'Super Over World Champion' : 'Tournament Champion';
-        } else if (G.round === 0) {
-            // Client requirement: QF match win awards 70 XP base
+        } else {
+            // R16 / QF / SF = 70 XP each
             baseXp = 70;
-            label = G.isSuperOver ? 'Super Over QF Win' : 'Quarter-Final Win';
-        } else if (G.round === 1) {
-            // Client requirement: SF match win awards 70 XP base
-            baseXp = 70;
-            label = G.isSuperOver ? 'Super Over SF Win' : 'Semi-Final Win';
+            const roundNames = ['Round of 16', 'Quarter-Final', 'Semi-Final'];
+            const rn = roundNames[G.round] || 'Match';
+            label = G.isSuperOver ? ('Super Over ' + rn + ' Win') : (rn + ' Win');
         }
     }
 
@@ -2576,7 +2645,7 @@ function showMatchResult() {
         addBtn(btnX, startY + 54, btnW, btnH, 'MAIN MENU', () => setScreen('menu'));
     } else if (won) {
         if (G.mode === 'tournament') {
-            if (G.round < 2) {
+            if (G.round < 3) {
                 addBtn(btnX, startY, btnW, btnH, 'NEXT ROUND ➔', () => {
                     G.round++;
                     setupMatch();
@@ -2641,12 +2710,14 @@ function setScreen(name) {
     case 'opponentSelect': {
         const isOpp = name === 'opponentSelect';
         const teams = isOpp ? TEAMS.filter(t => t !== G.playerTeam) : TEAMS;
-        const startY = isOpp ? 130 : 115;
-        const colW = (W - 56) / 2, rowH = 52, gap = 8;
+        const startY = isOpp ? 120 : 105;
+        const colW = (W - 56) / 2, rowH = 40, gap = 6;
         teams.forEach((t, i) => {
             const col = i % 2, row = Math.floor(i / 2);
             const x = 20 + col * (colW + 16), y = startY + row * (rowH + gap);
             const sub = `${t.stars} ${t.rating} OVR`;
+            // Use team secondary accent for the card border, or vibrant contrasting border
+            const cardBorder = (t.code === 'NZL') ? '#45B5AA' : (t.code === 'NAM' ? '#D21034' : (t.secondary || t.primary));
             addBtn(x, y, colW, rowH, t.name, () => {
                 ensureAudio();
                 sfxClick();
@@ -2663,7 +2734,7 @@ function setScreen(name) {
                         setScreen('matchIntro');
                     }
                 }
-            }, t.primary, sub);
+            }, t.primary, sub, cardBorder);
         });
 
         addBtn(W / 2 - 60, H * 0.92, 120, 38, 'BACK', () => {
