@@ -72,9 +72,7 @@ canvas {
         <h2 id="auth-title">ENTER THE <span>UNIVERSE</span></h2>
         <p class="auth-message" id="auth-message" aria-live="polite"></p>
         <div id="auth-view"></div>
-        <div class="auth-navigation" id="auth-navigation">
-            <button type="button" data-auth-switch="login">USE ANOTHER EMAIL</button>
-        </div>
+        <div class="auth-navigation" id="auth-navigation"></div>
     </section>
 </div>
 
@@ -3115,7 +3113,6 @@ refreshUserSession();
                 navEl.hidden = false;
                 navEl.innerHTML = `
                     <div class="auth-nav-row">
-                        <button type="button" class="auth-nav-link" data-auth-switch="signup">USE ANOTHER EMAIL</button>
                         <button type="button" class="auth-nav-link secondary" data-auth-switch="login">BACK TO SIGN IN</button>
                     </div>
                 `;
