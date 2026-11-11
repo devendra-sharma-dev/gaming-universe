@@ -3,7 +3,7 @@ const TimelineDailyGame = require("../models/TimelineDailyGame");
 
 const ROUNDS_PER_DAY = 5;
 const EVENTS_PER_ROUND = 4;
-const EVENTS_PER_DAY = ROUNDS_PER_ROUND * EVENTS_PER_ROUND;
+const EVENTS_PER_DAY = ROUNDS_PER_DAY * EVENTS_PER_ROUND;
 const dailyHydratedCache = new Map();
 
 const getGameDate = (now = new Date()) => now.toISOString().slice(0, 10);
