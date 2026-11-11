@@ -193,10 +193,22 @@ document.addEventListener("DOMContentLoaded", () => {
     // -------------------------------------------------------------
     const loadCountries = async () => {
         try {
+            const cachedRaw = sessionStorage.getItem("mo-countries-v1");
+            if (cachedRaw) {
+                const cached = JSON.parse(cachedRaw);
+                if (Array.isArray(cached) && cached.length > 0) {
+                    allCountries = cached;
+                    renderCountriesList(allCountries);
+                    return;
+                }
+            }
+        } catch (_cacheErr) {}
+        try {
             const res = await window.GamingSession.fetch(`${API_BASE}/countries`);
             const json = await res.json();
             if (json.success && Array.isArray(json.data.countries)) {
                 allCountries = json.data.countries;
+                try { sessionStorage.setItem("mo-countries-v1", JSON.stringify(allCountries)); } catch (_cacheErr) {}
             }
         } catch (_e) {
             // Fallback countries list if network error
@@ -274,6 +286,8 @@ document.addEventListener("DOMContentLoaded", () => {
         );
         renderCountriesList(filtered);
     });
+
+    loadCountries();
 
     btnToCountrySelect.addEventListener("click", () => {
         showScreen("countrySelect");
@@ -2445,12 +2459,16 @@ document.addEventListener("DOMContentLoaded", () => {
     // -------------------------------------------------------------
     // EVENT COMPLETION & RESULTS ENGINE
     // -------------------------------------------------------------
+    let isSubmittingEvent = false;
     const finishEvent = async (eventId, metrics, simOpponents = null) => {
+        if (isSubmittingEvent) return;
+        isSubmittingEvent = true;
         try {
             const bodyPayload = {
                 competitionId: competition.competitionId,
                 eventId: eventId,
                 metrics: metrics,
+                competitionSnapshot: { playerCountry: competition.playerCountry, opponents: competition.opponents, events: competition.events, standings: competition.standings, currentEventIndex: competition.currentEventIndex, eventResults: competition.eventResults || [] },
                 rawScore: metrics.rawScore
             };
             if (simOpponents) {
@@ -2471,10 +2489,26 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         } catch (_e) {
             alert("Could not reach server to finalize event.");
+        } finally {
+            isSubmittingEvent = false;
         }
     };
 
     const displayEventResults = (data) => {
+        if (competition) {
+            if (Array.isArray(data.standings)) competition.standings = data.standings;
+            if (typeof data.currentEventIndex === "number") competition.currentEventIndex = data.currentEventIndex;
+            if (data.eventRanked) {
+                competition.eventResults = competition.eventResults || [];
+                if (!competition.eventResults.some((er) => er.eventId === data.eventRanked.eventId)) {
+                    competition.eventResults.push(data.eventRanked);
+                }
+            }
+            if (data.isCompleted) {
+                competition.status = "completed";
+                competition.winnerCountry = data.winnerCountry || competition.winnerCountry;
+            }
+        }
         showScreen("eventResults");
 
         const ranked = data.eventRanked;
@@ -2855,7 +2889,7 @@ document.addEventListener("DOMContentLoaded", () => {
             await window.GamingSession.fetch(`${API_BASE}/competition/complete`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ competitionId: competition.competitionId })
+                body: JSON.stringify({ competitionId: competition.competitionId, competitionSnapshot: { playerCountry: competition.playerCountry, opponents: competition.opponents, events: competition.events, standings: competition.standings, currentEventIndex: competition.currentEventIndex, eventResults: competition.eventResults || [], status: "completed", winnerCountry: competition.winnerCountry } })
             });
         } catch (_e) {}
     };

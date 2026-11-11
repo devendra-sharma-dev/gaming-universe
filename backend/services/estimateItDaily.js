@@ -4,6 +4,16 @@ const EstimateItQuestion = require("../models/EstimateItQuestion");
 const { TOTAL_ROUNDS, seededIndices } = require("../games/estimateIt/logic");
 
 const getGameDate = (now = new Date()) => now.toISOString().slice(0, 10);
+const dailyQuestionsCache = new Map();
+
+const cacheDailyQuestions = (gameDate, questions) => {
+    dailyQuestionsCache.set(gameDate, questions);
+    if (dailyQuestionsCache.size > 7) {
+        const oldestKey = dailyQuestionsCache.keys().next().value;
+        dailyQuestionsCache.delete(oldestKey);
+    }
+    return questions;
+};
 
 /**
  * Returns 5 questions for the given date. If not yet assigned,
@@ -12,13 +22,16 @@ const getGameDate = (now = new Date()) => now.toISOString().slice(0, 10);
  * hit simultaneously, the second call sees the already-assigned set.
  */
 const getOrAssignDailyQuestions = async (gameDate = getGameDate()) => {
+    const cached = dailyQuestionsCache.get(gameDate);
+    if (cached && cached.length === TOTAL_ROUNDS) return cached;
+
     // Check if already assigned for this date
     const existing = await EstimateItQuestion.find({ usedInGameDate: gameDate })
         .sort({ _id: 1 })
         .select("question answer category unit")
         .lean();
 
-    if (existing.length === TOTAL_ROUNDS) return existing;
+    if (existing.length === TOTAL_ROUNDS) return cacheDailyQuestions(gameDate, existing);
 
     // Get unused question pool (only _id for index selection)
     const pool = await EstimateItQuestion.find({ usedInDailyGame: false })
@@ -52,8 +65,7 @@ const getOrAssignDailyQuestions = async (gameDate = getGameDate()) => {
         throw new Error(`Estimate It daily assignment failed for ${gameDate}. Only ${assigned.length} questions assigned.`);
     }
 
-    return assigned.slice(0, TOTAL_ROUNDS);
+    return cacheDailyQuestions(gameDate, assigned.slice(0, TOTAL_ROUNDS));
 };
 
 module.exports = { getGameDate, getOrAssignDailyQuestions };
-

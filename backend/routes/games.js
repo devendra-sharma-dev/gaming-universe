@@ -65,6 +65,16 @@ router.get("/word-bomb/validate", (request, response) => {
     response.json({ success: true, valid, word });
 });
 
+router.get("/word-bomb/dictionary", (_request, response) => {
+    const { getDictionaryFilePath } = require("../services/wordnikDictionary");
+    const file = getDictionaryFilePath();
+    if (!file) {
+        return response.status(404).json({ success: false, error: { message: "Dictionary unavailable." } });
+    }
+    response.setHeader("Cache-Control", "public, max-age=86400");
+    response.sendFile(file);
+});
+
 
 const wordBombRooms = require("../services/wordBombRooms");
 
@@ -79,8 +89,20 @@ const getWordBombActor = async (req) => {
     }
     const session = req.session;
     if (session?.userId) {
+        const skipUserLookup =
+            req.path === "/word-bomb/room/start" ||
+            req.path === "/word-bomb/room/submit" ||
+            req.path === "/word-bomb/room/leave";
+        if (skipUserLookup) {
+            return {
+                id: String(session.userId),
+                userId: String(session.userId),
+                username: req.body?.username || "PLAYER",
+                isGuest: false
+            };
+        }
         try {
-            const user = await User.findById(session.userId).select("username xp");
+            const user = await User.findById(session.userId).select("username").lean();
             if (user) {
                 return {
                     id: user._id.toString(),

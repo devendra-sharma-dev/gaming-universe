@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const score = document.querySelector("#timeline-score");
     const progress = document.querySelector("#timeline-progress");
     const result = document.querySelector("#timeline-result");
-    let daily; let roundIndex = 0; let placing = []; let drawerOrder = []; let locked = false;
+    let daily; let roundIndex = 0; let placing = []; let drawerOrder = []; let locked = false; let isSubmitting = false;
 
     // Auto-scroll controller for drag operations
     let autoScrollRaf = null;
@@ -64,10 +64,20 @@ document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener("drop", stopAutoScroll);
 
     const api = async (path, options = {}) => {
-        const response = await window.GamingSession.fetch(`${API}${path}`, { credentials: "include", headers: { "Content-Type": "application/json" }, ...options });
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(body.error?.message || "The timeline could not be reached.");
-        return body.data;
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+            try {
+                const res = await window.GamingSession.fetch(`${API}${path}`, { credentials: "include", headers: { "Content-Type": "application/json" }, ...options });
+                const payload = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(payload.error?.message || "The timeline could not be reached.");
+                return payload.data;
+            } catch (error) {
+                if (attempt === 0 && error instanceof TypeError) continue;
+                throw error;
+            }
+        }
+
+
+
     };
 
     const unpackEvent = (event) => {
@@ -373,9 +383,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const load = async () => {
         try {
-            const user = await api("/users/me");
+            const [user, dailyData] = await Promise.all([api("/users/me"), api("/timeline/daily")]);
             document.querySelector("#timeline-player-name").textContent = `@${(user.user || user).username}`;
-            daily = await api("/timeline/daily");
+            daily = dailyData;
             score.textContent = `${daily.totalScore} / 200 XP`;
             roundIndex = daily.rounds.findIndex((round) => !round.completed);
             if (roundIndex < 0) {
@@ -405,13 +415,17 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     submit.addEventListener("click", async () => {
-        if (locked || placedCount() !== 4) return;
+        if (locked || isSubmitting || placedCount() !== 4) return;
+        isSubmitting = true;
+        submit.textContent = "LOCKING IN…";
         submit.disabled = true;
         try {
             const outcome = await api(`/timeline/daily/rounds/${roundIndex}`, { method: "POST", body: JSON.stringify({ eventIds: placing.map((event) => event.id) }) });
             daily.totalScore += outcome.xpEarned;
             score.textContent = `${daily.totalScore} / 200 XP`;
             status.textContent = `${outcome.correctPositions} of 4 positions correct. Review the sequence below.`;
+            isSubmitting = false;
+            submit.textContent = "LOCK IN ORDER";
             showOutcome(outcome);
             submit.hidden = true;
             if (outcome.dailyComplete) {
@@ -424,6 +438,8 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (error) {
             status.textContent = error.message;
             submit.disabled = false;
+            submit.textContent = "LOCK IN ORDER";
+            isSubmitting = false;
         }
     });
 

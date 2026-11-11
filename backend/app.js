@@ -46,7 +46,22 @@ app.use(
     })
 );
 
-app.use(sessionMiddleware);
+const STATELESS_SESSION_PATHS = new Set([
+    "/api/v1/health",
+    "/api/v1/games/registry",
+    "/api/v1/games/word-bomb/validate",
+    "/api/v1/games/word-bomb/dictionary",
+    "/api/v1/mini-olympics/countries",
+    "/api/v1/mini-olympics/competition/start",
+    "/api/v1/mini-olympics/competition/event-result"
+]);
+
+app.use((request, response, next) => {
+    if (STATELESS_SESSION_PATHS.has(request.path)) {
+        return next();
+    }
+    return sessionMiddleware(request, response, next);
+});
 
 app.get("/api/v1/health", (_request, response) => {
     const isDatabaseConnected = mongoose.connection.readyState === 1;

@@ -32,26 +32,41 @@ const port = Number.parseInt(process.env.PORT, 10) || 5051;
 const createGameServer = ({ shared = Boolean(process.env.VERCEL) } = {}) => {
     let initialization;
     let initializeGames = async () => {};
+    const STATELESS_DB_FREE_PATHS = new Set([
+        "/api/v1/games/registry",
+        "/api/v1/games/word-bomb/validate",
+        "/api/v1/games/word-bomb/dictionary",
+        "/api/v1/mini-olympics/countries",
+        "/api/v1/mini-olympics/competition/start",
+        "/api/v1/mini-olympics/competition/event-result"
+    ]);
     const ready = () => {
         if (!initialization) initialization = (async () => {
             await connectDatabase();
-            await Promise.all([User.init(), OtpCode.init()]);
-            try {
-                const argon2 = require("argon2");
-                const defaultHash = await argon2.hash("admin123");
-                await User.updateMany(
-                    { $or: [{ passwordHash: { $exists: false } }, { passwordHash: null }] },
-                    { $set: { passwordHash: defaultHash } }
-                );
-            } catch (_err) {}
-            if (process.env.VERCEL) await require("mongoose").connection.collection("authRateLimits")
-                .createIndex({ resetTime: 1 }, { expireAfterSeconds: 0 });
+            const isVercelProd = Boolean(process.env.VERCEL && process.env.NODE_ENV === "production");
+            const ensureIndexes = async () => {
+                await Promise.all([User.init(), OtpCode.init()]);
+                if (process.env.VERCEL) {
+                    await require("mongoose").connection.collection("authRateLimits")
+                        .createIndex({ resetTime: 1 }, { expireAfterSeconds: 0 });
+                }
+            };
+            if (isVercelProd) {
+                ensureIndexes().catch(() => {});
+            } else {
+                await ensureIndexes();
+            }
             await initializeGames();
         })().catch(error => { initialization = null; throw error; });
         return initialization;
     };
     const { app, sessionMiddleware } = require("./app");
     const httpServer = http.createServer((request, response) => {
+        const pathname = (request.url || "").split("?")[0];
+        if (STATELESS_DB_FREE_PATHS.has(pathname)) {
+            app(request, response);
+            return;
+        }
         ready().then(() => app(request, response)).catch(() => {
             response.writeHead(503, { "Content-Type": "application/json" });
             response.end(JSON.stringify({ success: false, error: { message: "Service temporarily unavailable." } }));
@@ -90,7 +105,7 @@ const createGameServer = ({ shared = Boolean(process.env.VERCEL) } = {}) => {
 
             const user = await User.findById(session.userId).select(
                 "username xp"
-            );
+            ).lean();
 
             if (!user) {
                 const error = new Error("Authentication required.");
@@ -107,7 +122,11 @@ const createGameServer = ({ shared = Boolean(process.env.VERCEL) } = {}) => {
             };
 
             // A socket must not keep account access after another tab logs out.
+            let lastSessionCheck = Date.now();
             socket.use((_packet, nextPacket) => {
+                if (Date.now() - lastSessionCheck < 3000) {
+                    return nextPacket();
+                }
                 socket.request.session.reload((error) => {
                     const current = socket.request.session;
                     if (error || String(current?.userId) !== socket.user.id ||
@@ -116,6 +135,7 @@ const createGameServer = ({ shared = Boolean(process.env.VERCEL) } = {}) => {
                         socket.disconnect(true);
                         return nextPacket(new Error("Authentication required."));
                     }
+                    lastSessionCheck = Date.now();
                     nextPacket();
                 });
             });

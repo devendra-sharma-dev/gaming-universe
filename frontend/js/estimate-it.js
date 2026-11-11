@@ -18,6 +18,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentBet = 100;
     let intermediateResult = null; // Holds the reveal data between rounds
     let gameStarted = false;
+    let isSubmitting = false;
 
     /* ── Screen Red Boundary Alert (Under 10s) ─────────────── */
 
@@ -557,6 +558,8 @@ document.addEventListener("DOMContentLoaded", () => {
     /* ── Submit Estimate ─────────────────────────────────── */
 
     const submitEstimate = async (estimateValue) => {
+        if (isSubmitting) return;
+        isSubmitting = true;
         const submitBtn = document.querySelector("#ei-submit-btn");
         if (submitBtn) {
             submitBtn.disabled = true;
@@ -608,6 +611,8 @@ document.addEventListener("DOMContentLoaded", () => {
             // Resume the countdown timer from the exact remaining seconds — NEVER reset back to 60s
             if (timerRemaining > 0) resumeTimer();
             showToast(error.message || "Connection issue. Please try again.");
+        } finally {
+            isSubmitting = false;
         }
     };
 
