@@ -19,11 +19,12 @@ const createSessionMiddleware = () => {
         secret: sessionSecret,
         resave: false,
         saveUninitialized: false,
-        rolling: true,
+        rolling: false,
         store: MongoStore.create({
             mongoUrl: process.env.MONGODB_URI,
             collectionName: "sessions",
-            ttl: 365 * 24 * 60 * 60
+            ttl: 365 * 24 * 60 * 60,
+            touchAfter: 24 * 3600
         }),
         cookie: {
             httpOnly: true,

@@ -11,7 +11,11 @@ function attachHostedGames(io, ready) {
     let games;
     const initialize = async () => {
         games = createSharedGames();
-        await games.init();
+        if (process.env.VERCEL && process.env.NODE_ENV === "production") {
+            games.init().catch(() => {});
+        } else {
+            await games.init();
+        }
     };
     io.on("connection", socket => {
         // The page token survives transport reconnects, but is never an account
@@ -28,7 +32,7 @@ function attachHostedGames(io, ready) {
             userId: guest ? null : socket.user.id,
             username: guest ? `Guest${key.slice(0, 8)}` : socket.user.username, isGuest: guest };
 
-        let stopped = false, timer, seenRoom, cursor = 0, fingerprint, heartbeat = 0;
+        let stopped = false, timer, seenRoom, cursor = 0, fingerprint, heartbeat = 0, shouldPoll = false;
         // Serialize actions and polling for this connection. Different instances
         // coordinate through MongoDB transactions, not through this local chain.
         let pending = Promise.resolve();
@@ -58,6 +62,7 @@ function attachHostedGames(io, ready) {
             if (result.timeout === "tic-tac-toe") socket.emit("tic-tac-toe:matchmaking-timeout");
 
             const room = result.room;
+            shouldPoll = Boolean(room || result.queued);
             if (!room) { seenRoom = null; fingerprint = null; return; }
             const state = publicRoom(room);
             if (seenRoom !== room._id) {
@@ -79,6 +84,16 @@ function attachHostedGames(io, ready) {
             }
             cursor = room.sequenceNumber;
         };
+        const schedulePoll = () => {
+            clearTimeout(timer);
+            if (!stopped && shouldPoll) {
+                timer = setTimeout(poll, 1000);
+            }
+        };
+        const poll = () => {
+            enqueue(sync);
+            pending.finally(schedulePoll);
+        };
         for (const name of actions) socket.on(name, (payload = {}) => enqueue(async () => {
             try {
                 await ready();
@@ -86,22 +101,14 @@ function attachHostedGames(io, ready) {
                 await games.touch(actor);
                 const result = await games.act(actor, name, payload && typeof payload === "object" ? payload : {});
                 if (result.queued) socket.emit("tic-tac-toe:queue-status", { status: "searching", timeoutMs: 8000 });
-
-
-
-
-
                 await sync();
+                if (shouldPoll && !timer) schedulePoll();
             } catch (error) {
                 // Database errors can contain connection information; expose only
                 // validation errors constructed by the game engine.
                 socket.emit(`${name.split(":")[0]}:error`, { message: error.publicMessage || "Game action failed. Please retry." });
             }
         }));
-        const poll = () => {
-            enqueue(sync);
-            pending.finally(() => { if (!stopped) timer = setTimeout(poll, 1000); });
-        };
         poll();
         socket.on("disconnect", () => {
             stopped = true;

@@ -12,7 +12,9 @@ const requireAuth = async (request, response, next) => {
             });
         }
 
-        const user = await User.findById(request.session.userId);
+        const user = await User.findById(request.session.userId)
+            .select("_id username email xp favorites")
+            .lean();
 
         if (!user) {
             request.session.destroy(() => {});

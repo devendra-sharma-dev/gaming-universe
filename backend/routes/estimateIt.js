@@ -22,8 +22,8 @@ const asyncRoute = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next
 const buildView = (attempt, questions) => {
     const roundIndex = attempt.currentRound - 1;
     const currentQuestion = questions[roundIndex];
-    const completedRounds = attempt.rounds.map(r => ({
-        round: attempt.rounds.indexOf(r) + 1,
+    const completedRounds = attempt.rounds.map((r, index) => ({
+        round: index + 1,
         question: r.question,
         category: r.category,
         unit: r.unit,
@@ -70,10 +70,12 @@ router.use(requireAuth);
 
 router.get("/daily", asyncRoute(async (req, res) => {
     const gameDate = getGameDate();
-    const questions = await getOrAssignDailyQuestions(gameDate);
+    const [questions, existingAttempt] = await Promise.all([
+        getOrAssignDailyQuestions(gameDate),
+        EstimateItAttempt.findOne({ userId: req.user._id, gameDate }).lean()
+    ]);
 
-    let attempt = await EstimateItAttempt.findOne({ userId: req.user._id, gameDate });
-
+    let attempt = existingAttempt;
     if (!attempt) {
         try {
             attempt = await EstimateItAttempt.create({
@@ -84,7 +86,7 @@ router.get("/daily", asyncRoute(async (req, res) => {
             });
         } catch (error) {
             if (error.code === 11000) {
-                attempt = await EstimateItAttempt.findOne({ userId: req.user._id, gameDate });
+                attempt = await EstimateItAttempt.findOne({ userId: req.user._id, gameDate }).lean();
             } else throw error;
         }
     }
@@ -96,9 +98,11 @@ router.get("/daily", asyncRoute(async (req, res) => {
 
 router.post("/daily/submit", asyncRoute(async (req, res) => {
     const gameDate = getGameDate();
-    const questions = await getOrAssignDailyQuestions(gameDate);
+    const [questions, attempt] = await Promise.all([
+        getOrAssignDailyQuestions(gameDate),
+        EstimateItAttempt.findOne({ userId: req.user._id, gameDate }).lean()
+    ]);
 
-    const attempt = await EstimateItAttempt.findOne({ userId: req.user._id, gameDate });
     if (!attempt) throw createHttpError(404, "Start today's Estimate It game first.");
     if (attempt.status !== "active") throw createHttpError(409, "Today's Estimate It game is already complete.");
 
@@ -139,8 +143,8 @@ router.post("/daily/submit", asyncRoute(async (req, res) => {
         xpEarned = calculateXp(bet, tier.multiplier);
     }
 
-    // Record the round
-    attempt.rounds.push({
+    const roundedPercentageError = Math.round(percentageError * 100) / 100;
+    const roundEntry = {
         questionId: currentQuestion._id,
         question: currentQuestion.question,
         actualAnswer,
@@ -148,54 +152,18 @@ router.post("/daily/submit", asyncRoute(async (req, res) => {
         unit: currentQuestion.unit,
         estimate: timedOut ? null : estimate,
         bet,
-        percentageError: Math.round(percentageError * 100) / 100,
+        percentageError: roundedPercentageError,
         multiplier: tier.multiplier,
         xpEarned,
         submittedAt: new Date()
-    });
+    };
 
-    attempt.remainingChips -= bet;
-    attempt.totalXp += xpEarned;
-
-    // Check if game is complete
-    if (attempt.currentRound === TOTAL_ROUNDS) {
-        attempt.status = "completed";
-        attempt.completedAt = new Date();
-        await attempt.save();
-
-        // Award XP atomically (same pattern as tic-tac-toe)
-        const { awardEstimateItXp } = require("../services/xp");
-        const totalUserXp = await awardEstimateItXp({
-            attemptId: attempt._id,
-            userId: req.user._id,
-            xpAmount: attempt.totalXp
-        });
-
-        const view = buildView(attempt, questions);
-        view.roundResult = {
-            estimate: timedOut ? null : estimate,
-            actualAnswer,
-            percentageError: Math.round(percentageError * 100) / 100,
-            multiplier: tier.multiplier,
-            label: tier.label,
-            emoji: tier.emoji,
-            xpEarned,
-            bet,
-            timedOut
-        };
-        if (totalUserXp !== null) view.totalUserXp = totalUserXp;
-        return res.json({ success: true, data: view });
-    }
-
-    // Advance to next round
-    attempt.currentRound += 1;
-    await attempt.save();
-
-    const view = buildView(attempt, questions);
-    view.roundResult = {
+    const nextRemainingChips = attempt.remainingChips - bet;
+    const nextTotalXp = attempt.totalXp + xpEarned;
+    const roundResult = {
         estimate: timedOut ? null : estimate,
         actualAnswer,
-        percentageError: Math.round(percentageError * 100) / 100,
+        percentageError: roundedPercentageError,
         multiplier: tier.multiplier,
         label: tier.label,
         emoji: tier.emoji,
@@ -204,6 +172,65 @@ router.post("/daily/submit", asyncRoute(async (req, res) => {
         timedOut
     };
 
+    // Check if game is complete
+    if (attempt.currentRound === TOTAL_ROUNDS) {
+        const updatedAttempt = await EstimateItAttempt.findOneAndUpdate(
+            { _id: attempt._id, currentRound: TOTAL_ROUNDS, status: "active", xpAwarded: false },
+            {
+                $push: { rounds: roundEntry },
+                $set: {
+                    remainingChips: nextRemainingChips,
+                    totalXp: nextTotalXp,
+                    status: "completed",
+                    completedAt: new Date(),
+                    xpAwarded: true
+                }
+            },
+            { new: true }
+        ).lean();
+        if (!updatedAttempt) {
+            throw createHttpError(409, "This round has already been submitted.");
+        }
+
+        let totalUserXp = null;
+        if (nextTotalXp > 0) {
+            const updatedUser = await User.findByIdAndUpdate(
+                req.user._id,
+                { $inc: { xp: nextTotalXp } },
+                { new: true }
+            ).select("xp").lean();
+            totalUserXp = updatedUser ? updatedUser.xp : null;
+        } else {
+            const existingUser = await User.findById(req.user._id).select("xp").lean();
+            totalUserXp = existingUser ? existingUser.xp : null;
+        }
+
+        const view = buildView(updatedAttempt, questions);
+        view.roundResult = roundResult;
+        if (totalUserXp !== null) view.totalUserXp = totalUserXp;
+        return res.json({ success: true, data: view });
+    }
+
+    // Advance to next round atomically
+    const updatedAttempt = await EstimateItAttempt.findOneAndUpdate(
+        { _id: attempt._id, currentRound: attempt.currentRound, status: "active" },
+        {
+            $push: { rounds: roundEntry },
+            $set: {
+                remainingChips: nextRemainingChips,
+                totalXp: nextTotalXp,
+                currentRound: attempt.currentRound + 1
+            }
+        },
+        { new: true }
+    ).lean();
+    if (!updatedAttempt) {
+        throw createHttpError(409, "This round has already been submitted.");
+    }
+
+    const view = buildView(updatedAttempt, questions);
+    view.roundResult = roundResult;
+
     res.json({ success: true, data: view });
 }));
 
@@ -211,12 +238,13 @@ router.post("/daily/submit", asyncRoute(async (req, res) => {
 
 router.get("/daily/result", asyncRoute(async (req, res) => {
     const gameDate = req.query.date || getGameDate();
-    const attempt = await EstimateItAttempt.findOne({ userId: req.user._id, gameDate });
+    const [attempt, questions] = await Promise.all([
+        EstimateItAttempt.findOne({ userId: req.user._id, gameDate }).lean(),
+        getOrAssignDailyQuestions(gameDate)
+    ]);
     if (!attempt) throw createHttpError(404, "No Estimate It game found for this date.");
 
-    const questions = await getOrAssignDailyQuestions(gameDate);
     res.json({ success: true, data: buildView(attempt, questions) });
 }));
 
 module.exports = router;
-

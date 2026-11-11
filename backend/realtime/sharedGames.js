@@ -249,7 +249,53 @@ function createSharedGames({ now = Date.now } = {}) {
         await save(room, session);
         return {};
     });
-    const read = actor => transaction(async session => {
+    const read = async actor => {
+        const member = await players.findOne({ _id: actor.key });
+        if (!member) return {};
+        if (member.queueGame && member.queueUntil <= now()) {
+            return transaction(async session => {
+                const freshMember = await players.findOne({ _id: actor.key }, { session });
+                if (!freshMember) return {};
+                if (freshMember.queueGame && freshMember.queueUntil <= now()) {
+                    await players.updateOne({ _id: actor.key }, { $set: { queueGame: null } }, { session });
+                    return { timeout: freshMember.queueGame };
+                }
+                const room = freshMember.roomId && await rooms.findOne({ _id: freshMember.roomId }, { session });
+                if (room && room.players.some(p => p.key === actor.key)) {
+                    if (await settle(room, session)) await save(room, session);
+                    return { room };
+                }
+                return { queued: freshMember.queueGame };
+            });
+        }
+        const room = member.roomId && await rooms.findOne({ _id: member.roomId });
+        if (room && room.players.some(p => p.key === actor.key)) {
+            let needsSettle = false;
+            if (!terminal(room)) {
+                if (room.game === "word-bomb" && room.status === "active" && room.deadline <= now()) {
+                    needsSettle = true;
+                } else {
+                    const activePlayerKeys = room.players.filter(p => !p.eliminated).map(p => p.key);
+                    if (activePlayerKeys.length > 0) {
+                        const presentCount = await players.countDocuments({
+                            _id: { $in: activePlayerKeys },
+                            lastSeen: { $gt: now() - PRESENCE_MS }
+                        });
+                        if (presentCount < activePlayerKeys.length) needsSettle = true;
+                    }
+                }
+            }
+            if (!needsSettle) return { room };
+            return transaction(async session => {
+                const freshRoom = await rooms.findOne({ _id: room._id }, { session });
+                if (!freshRoom || !freshRoom.players.some(p => p.key === actor.key)) return {};
+                if (await settle(freshRoom, session)) await save(freshRoom, session);
+                return { room: freshRoom };
+            });
+        }
+        return { queued: member.queueGame };
+    };
+    const _legacyReadUnused = actor => transaction(async session => {
         const member = await players.findOne({ _id: actor.key }, { session });
         if (!member) return {};
         if (member.queueGame && member.queueUntil <= now()) {

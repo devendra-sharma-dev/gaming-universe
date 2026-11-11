@@ -1,6 +1,10 @@
 const mongoose = require("mongoose");
 
 const connectDatabase = async () => {
+    if (mongoose.connection.readyState === 1) {
+        return;
+    }
+
     const connectionString = process.env.MONGODB_URI;
 
     if (!connectionString) {
@@ -9,7 +13,9 @@ const connectDatabase = async () => {
 
     try {
         await mongoose.connect(connectionString, {
-            serverSelectionTimeoutMS: 10000
+            serverSelectionTimeoutMS: 10000,
+            maxPoolSize: 10,
+            minPoolSize: 1
         });
     } catch (error) {
         if (error && error.name === "MongoParseError") {

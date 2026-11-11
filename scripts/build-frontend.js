@@ -15,6 +15,14 @@ const output = path.join(root, "dist");
 fs.rmSync(output, { recursive: true, force: true });
 fs.mkdirSync(output, { recursive: true });
 fs.cpSync(path.join(root, "frontend"), output, { recursive: true });
+
+const dictionarySrc = path.join(root, "Dictionary.txt");
+if (fs.existsSync(dictionarySrc)) {
+    const dataDir = path.join(output, "data");
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.copyFileSync(dictionarySrc, path.join(dataDir, "dictionary.txt"));
+}
+
 const sessionPath = path.join(output, "js", "session.js");
 const sessionSource = fs.readFileSync(path.join(root, "frontend", "js", "session.js"), "utf8");
 fs.writeFileSync(sessionPath,

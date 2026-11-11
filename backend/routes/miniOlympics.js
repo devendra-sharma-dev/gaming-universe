@@ -28,6 +28,38 @@ const activeCompetitions = new Map();
 const asyncRoute = (fn) => (req, res, next) =>
     Promise.resolve(fn(req, res, next)).catch(next);
 
+const hydrateCompetitionFromSnapshot = (competitionId, snapshot) => {
+    if (!snapshot || typeof snapshot !== "object") return null;
+    const playerCode = String(snapshot.playerCountry?.code || "").toUpperCase().trim();
+    const playerCountry = getCountryByCode(playerCode);
+    if (
+        !playerCountry ||
+        !Array.isArray(snapshot.opponents) ||
+        !Array.isArray(snapshot.events) ||
+        !Array.isArray(snapshot.standings) ||
+        typeof snapshot.currentEventIndex !== "number"
+    ) {
+        return null;
+    }
+
+    const hydrated = {
+        competitionId,
+        playerCountry,
+        opponents: snapshot.opponents,
+        participants: [playerCountry, ...snapshot.opponents],
+        events: snapshot.events.length ? snapshot.events : EVENTS,
+        currentEventIndex: snapshot.currentEventIndex,
+        standings: snapshot.standings,
+        eventResults: Array.isArray(snapshot.eventResults) ? snapshot.eventResults : [],
+        status: snapshot.status === "completed" ? "completed" : "active",
+        winnerCountry: snapshot.winnerCountry || null,
+        completedAt: snapshot.status === "completed" ? new Date() : null,
+        createdAt: new Date()
+    };
+    activeCompetitions.set(competitionId, hydrated);
+    return hydrated;
+};
+
 /**
  * Clean up active competitions older than 2 hours to avoid memory leak
  */
@@ -47,6 +79,9 @@ setInterval(() => {
 router.get("/countries", (req, res) => {
     const query = req.query.q;
     const list = query ? searchCountries(query) : getAllCountries();
+    if (!query) {
+        res.setHeader("Cache-Control", "public, max-age=86400");
+    }
     res.json({
         success: true,
         data: {
@@ -97,13 +132,14 @@ router.post(
 router.post(
     "/competition/event-result",
     asyncRoute(async (req, res) => {
-        const { competitionId, eventId, metrics, rawScore } = req.body;
+        const { competitionId, eventId, metrics, rawScore, competitionSnapshot } = req.body;
 
         if (!competitionId) {
             throw createHttpError(400, "Competition ID is required.");
         }
 
-        const comp = activeCompetitions.get(competitionId);
+        const comp = activeCompetitions.get(competitionId)
+            || hydrateCompetitionFromSnapshot(competitionId, competitionSnapshot);
         if (!comp) {
             throw createHttpError(404, "Active competition not found or expired. Please start a new competition.");
         }
@@ -195,12 +231,13 @@ router.post(
 router.post(
     "/competition/complete",
     asyncRoute(async (req, res) => {
-        const { competitionId } = req.body;
+        const { competitionId, competitionSnapshot } = req.body;
         if (!competitionId) {
             throw createHttpError(400, "Competition ID is required.");
         }
 
-        const comp = activeCompetitions.get(competitionId);
+        const comp = activeCompetitions.get(competitionId)
+            || hydrateCompetitionFromSnapshot(competitionId, competitionSnapshot);
         if (!comp) {
             throw createHttpError(404, "Active competition not found.");
         }
