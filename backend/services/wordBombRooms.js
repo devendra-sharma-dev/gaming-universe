@@ -101,7 +101,7 @@ const generateCode = async () => {
 const publicRoom = (room) => {
     if (!room) return null;
     return {
-        matchId: room._id || room.matchId,
+        matchId: room.matchId || room._id,
         code: room.code,
         mode: room.mode || "multiplayer",
         isPublic: Boolean(room.isPublic),
@@ -431,13 +431,21 @@ const rematchRoom = async (actor, code) => {
     const isHost = room.hostId === actor.id || room.players[0]?.id === actor.id;
     if (!isHost) throw new Error("Only the host can restart the room.");
 
-    room._id = crypto.randomUUID();
+    // Keep room._id unchanged so replaceOne updates the existing room document in-place
+    room.matchId = crypto.randomUUID();
+    room.status = "lobby";
     room.winnerId = null;
     room.finishReason = null;
     room.xpAwarded = false;
     room.usedWords = [];
     room.eliminatedCount = 0;
     room.sequenceFailedIds = [];
+    room.sequence = chooseSequence(room.recentSequences || []);
+    room.sequenceStartPlayerId = room.players[0]?.id || null;
+    room.round = 0;
+    room.turnIndex = 0;
+    room.deadline = null;
+    room.expiresAt = new Date(Date.now() + 86400000);
     for (const p of room.players) {
         p.eliminated = false;
         p.eliminatedOrder = 0;
@@ -450,20 +458,10 @@ const rematchRoom = async (actor, code) => {
         p.totalXp = null;
     }
 
-    if (room.players.length >= 2) {
-        room.status = "active";
-        room.sequence = chooseSequence(room.recentSequences || []);
-        room.sequenceStartPlayerId = room.players[0]?.id || null;
-        room.round = 1;
-        room.turnIndex = 0;
-        room.deadline = Date.now() + TURN_MS;
-    } else {
-        room.status = "lobby";
-        room.round = 0;
-        room.turnIndex = 0;
-        room.deadline = null;
+    const col = getRoomsCollection();
+    if (col) {
+        await col.deleteMany({ code: room.code, game: "word-bomb", _id: { $ne: room._id } });
     }
-
     await saveRoom(room);
     return publicRoom(room);
 };

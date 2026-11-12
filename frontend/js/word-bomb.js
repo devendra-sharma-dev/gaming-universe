@@ -740,7 +740,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (isActive || isLobby) {
             shownFinishMatchId = null;
         } else if (next.status === "finished" && !isSolo) {
-            stopRoomPolling();
             const finishKey = next.matchId || `${next.code}:${next.round}`;
             if (shownFinishMatchId !== finishKey) {
                 shownFinishMatchId = finishKey;
@@ -777,7 +776,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (isSubmittingWord || isPollingRoom) return;
             isPollingRoom = true;
             try {
-                const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/${code}`);
+                const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/${code}`, { cache: "no-store" });
                 if (res.ok) {
                     const body = await res.json();
                     const nextRoom = body.data?.room;
@@ -796,7 +795,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const fetchPublicLobbies = async () => {
         try {
-            const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/lobbies`);
+            const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/lobbies`, { cache: "no-store" });
             if (res.ok) {
                 const body = await res.json();
                 renderLobbiesList(body.data?.lobbies || []);
@@ -1191,7 +1190,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                     arena?.classList.add("arena-shake");
                     setTimeout(() => arena?.classList.remove("arena-shake"), 600);
                 }
-            } catch (_e) {} finally {
+            } catch (_e) {
+                if (feed) feed.textContent = "✕ Network error submitting word. Please retry.";
+            } finally {
                 isSubmittingWord = false;
             }
             if (!accepted && room === submittedRoom && room.status === "active" && !input.value) {
