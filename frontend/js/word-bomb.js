@@ -1208,7 +1208,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             keepalive: true
         }).catch(() => {});
     };
-    window.addEventListener("pagehide", handlePageExit);
     window.addEventListener("beforeunload", handlePageExit);
 
     // Clear error message when user starts typing a new word
@@ -1351,16 +1350,34 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (room?.code) {
             let accepted = false;
-            const submitController = typeof AbortController === "function" ? new AbortController() : null;
-            const submitTimeout = submitController ? setTimeout(() => submitController.abort(), 8000) : null;
+            const sendWordOnce = async () => {
+                const ctrl = typeof AbortController === "function" ? new AbortController() : null;
+                const tId = ctrl ? setTimeout(() => ctrl.abort(), 8000) : null;
+                try {
+                    const resp = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/submit`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ code: room.code, word }),
+                        signal: ctrl?.signal
+                    });
+                    const parsed = await resp.json().catch(() => null);
+                    return { res: resp, body: parsed };
+                } finally {
+                    if (tId) clearTimeout(tId);
+                }
+            };
             try {
-                const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/submit`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ code: room.code, word }),
-                    signal: submitController?.signal
-                });
-                const body = await res.json().catch(() => null);
+                let attemptResult;
+                try {
+                    attemptResult = await sendWordOnce();
+                } catch (_firstErr) {
+                    if (submitEpoch !== roomEpoch || !activeRoomCode) return;
+                    attemptResult = await sendWordOnce();
+                }
+                if (!attemptResult.res.ok && attemptResult.res.status >= 500 && submitEpoch === roomEpoch && activeRoomCode) {
+                    attemptResult = await sendWordOnce();
+                }
+                const { res, body } = attemptResult;
                 if (submitEpoch !== roomEpoch || !activeRoomCode) return;
                 if (res.ok && body?.data?.valid) {
                     accepted = true;
@@ -1388,7 +1405,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             } catch (_e) {
                 if (feed) feed.textContent = "✕ Network error submitting word. Please retry.";
             } finally {
-                if (submitTimeout) clearTimeout(submitTimeout);
                 isSubmittingWord = false;
                 if (!accepted && submitEpoch === roomEpoch && activeRoomCode) {
                     pollRoomOnce(activeRoomCode, submitEpoch);

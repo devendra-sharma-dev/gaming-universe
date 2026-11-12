@@ -11,6 +11,7 @@ const TURN_MS = 20000;
 const MAX_PLAYERS = 6;
 const START_LIVES = 3;
 const DISCONNECT_MS = 25000;
+const ACTIVE_DISCONNECT_MS = 45000;
 const SUBMIT_GRACE_MS = 1500;
 
 // Load substring pool
@@ -87,7 +88,8 @@ const saveRoomAtomic = async (room) => {
         const filter = expectedVersion === 0
             ? { _id: room._id, ["$or"]: [{ version: 0 }, { version: { ["$exists"]: false } }] }
             : { _id: room._id, version: expectedVersion };
-        const res = await col.updateOne(filter, { ["$set"]: room });
+        const { _id, ...updateFields } = room;
+        const res = await col.updateOne(filter, { $set: updateFields });
         if (res.matchedCount === 0) {
             room.version = expectedVersion;
             return false;
@@ -409,7 +411,7 @@ const pruneDisconnectedPlayers = async (room, viewerId = null) => {
     if (viewerId) {
         const viewer = room.players.find((p) => p.id === viewerId);
         if (viewer && !viewer.left) {
-            shouldPersistHeartbeat = !viewer.lastSeenAt || (now - viewer.lastSeenAt >= 5000);
+            shouldPersistHeartbeat = !viewer.lastSeenAt || (now - viewer.lastSeenAt >= 3000);
             viewer.lastSeenAt = now;
         }
     }
@@ -431,7 +433,7 @@ const pruneDisconnectedPlayers = async (room, viewerId = null) => {
         }
     } else if (room.status === "active") {
         for (const p of room.players) {
-            if (!p.eliminated && !p.left && p.lastSeenAt && (now - p.lastSeenAt > DISCONNECT_MS)) {
+            if (!p.eliminated && !p.left && p.lastSeenAt && (now - p.lastSeenAt > ACTIVE_DISCONNECT_MS)) {
                 p.left = true;
                 p.eliminated = true;
                 p.lives = 0;
@@ -551,10 +553,29 @@ const rematchRoom = async (actor, code) => {
     // Remove players who left or disconnected so they are never dragged back into a replayed lobby
     const now = Date.now();
     room.players = room.players.filter(
-        (p) => !p.left && (p.id === actor.id || !p.lastSeenAt || now - p.lastSeenAt <= DISCONNECT_MS)
+        (p) => p.id === actor.id || (!p.left && (!p.lastSeenAt || now - p.lastSeenAt <= DISCONNECT_MS))
     );
-    const hostPlayer = room.players.find((p) => p.id === actor.id);
-    if (hostPlayer) hostPlayer.lastSeenAt = now;
+    let hostPlayer = room.players.find((p) => p.id === actor.id);
+    if (!hostPlayer) {
+        hostPlayer = {
+            id: actor.id,
+            userId: actor.isGuest ? null : actor.id,
+            username: actor.username,
+            lives: START_LIVES,
+            eliminated: false,
+            left: false,
+            lastSeenAt: now,
+            eliminatedOrder: 0,
+            isGuest: Boolean(actor.isGuest),
+            alphabetUsed: [],
+            alphabetProgress: 0,
+            streak: 0
+        };
+        room.players.unshift(hostPlayer);
+    }
+    hostPlayer.left = false;
+    hostPlayer.lastSeenAt = now;
+    room.hostId = actor.id;
 
     // Keep room._id unchanged so replaceOne updates the existing room document in-place
     room.matchId = crypto.randomUUID();
