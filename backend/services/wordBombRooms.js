@@ -11,6 +11,7 @@ const TURN_MS = 20000;
 const MAX_PLAYERS = 6;
 const START_LIVES = 3;
 const DISCONNECT_MS = 25000;
+const SUBMIT_GRACE_MS = 1500;
 
 // Load substring pool
 let substringPools = {
@@ -67,6 +68,7 @@ const findRoomByCode = async (code) => {
 };
 
 const saveRoom = async (room) => {
+    room.version = (typeof room.version === "number" ? room.version : 0) + 1;
     room.updatedAt = new Date();
     const col = getRoomsCollection();
     if (col) {
@@ -74,6 +76,26 @@ const saveRoom = async (room) => {
     } else {
         memoryRooms.set(room.code, room);
     }
+};
+
+const saveRoomAtomic = async (room) => {
+    const expectedVersion = typeof room.version === "number" ? room.version : 0;
+    room.version = expectedVersion + 1;
+    room.updatedAt = new Date();
+    const col = getRoomsCollection();
+    if (col) {
+        const filter = expectedVersion === 0
+            ? { _id: room._id, ["$or"]: [{ version: 0 }, { version: { ["$exists"]: false } }] }
+            : { _id: room._id, version: expectedVersion };
+        const res = await col.updateOne(filter, { ["$set"]: room });
+        if (res.matchedCount === 0) {
+            room.version = expectedVersion;
+            return false;
+        }
+        return true;
+    }
+    memoryRooms.set(room.code, room);
+    return true;
 };
 
 const deleteRoom = async (code) => {
@@ -186,12 +208,15 @@ const awardMatchXp = async (room, winner) => {
 };
 
 const finishMatch = async (room, winner, reason = "last-player") => {
-    if (room.status === "finished") return;
+    if (room.status === "finished") return false;
     room.status = "finished";
     room.winnerId = winner?.id || null;
     room.finishReason = reason;
+    const claimed = await saveRoomAtomic(room);
+    if (!claimed) return false;
     await awardMatchXp(room, winner);
     await saveRoom(room);
+    return true;
 };
 
 const settleTimeout = async (room, graceMs = 0) => {
@@ -216,8 +241,7 @@ const settleTimeout = async (room, graceMs = 0) => {
 
     const alive = room.players.filter((p) => !p.eliminated && !p.left);
     if (alive.length <= 1) {
-        await finishMatch(room, alive[0] || null, "last-player");
-        return true;
+        return await finishMatch(room, alive[0] || null, "last-player");
     }
 
     // Advance turn
@@ -240,8 +264,7 @@ const settleTimeout = async (room, graceMs = 0) => {
     }
 
     room.deadline = Date.now() + TURN_MS;
-    await saveRoom(room);
-    return true;
+    return await saveRoomAtomic(room);
 };
 
 const findHostedLobbyByActor = async (actorId) => {
@@ -420,8 +443,8 @@ const pruneDisconnectedPlayers = async (room, viewerId = null) => {
         if (changed) {
             const alive = room.players.filter((p) => !p.eliminated && !p.left);
             if (alive.length <= 1) {
-                await finishMatch(room, alive[0] || null, "abandoned");
-                return { deleted: false, changed: true };
+                const ok = await finishMatch(room, alive[0] || null, "abandoned");
+                return { deleted: false, changed: ok, conflict: !ok };
             }
             const curr = room.players[room.turnIndex];
             if (!curr || curr.eliminated || curr.left) {
@@ -437,7 +460,8 @@ const pruneDisconnectedPlayers = async (room, viewerId = null) => {
     }
 
     if (changed) {
-        await saveRoom(room);
+        const ok = await saveRoomAtomic(room);
+        return { deleted: false, changed: ok, conflict: !ok };
     } else if (shouldPersistHeartbeat && viewerId) {
         const col = getRoomsCollection();
         if (col && room._id) {
@@ -447,16 +471,24 @@ const pruneDisconnectedPlayers = async (room, viewerId = null) => {
             );
         }
     }
-    return { deleted: false, changed };
+    return { deleted: false, changed: false, conflict: false };
 };
 
 const getRoomState = async (code, graceMs = 0, viewerId = null) => {
-    const room = await findRoomByCode(code);
-    if (!room) return null;
-    const { deleted } = await pruneDisconnectedPlayers(room, viewerId);
-    if (deleted) return null;
-    await settleTimeout(room, graceMs);
-    return publicRoom(room);
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const room = await findRoomByCode(code);
+        if (!room) return null;
+        const pruneRes = await pruneDisconnectedPlayers(room, viewerId);
+        if (pruneRes.deleted) return null;
+        if (pruneRes.conflict) continue;
+        if (room.status === "active" && room.deadline && (Date.now() + graceMs) >= room.deadline) {
+            const settled = await settleTimeout(room, graceMs);
+            if (!settled) continue;
+        }
+        return publicRoom(room);
+    }
+    const finalRoom = await findRoomByCode(code);
+    return finalRoom ? publicRoom(finalRoom) : null;
 };
 
 const renameGuest = async (actor, code, rawUsername) => {
@@ -561,25 +593,30 @@ const rematchRoom = async (actor, code) => {
 };
 
 const submitWord = async (actor, code, rawWord) => {
-    const room = await findRoomByCode(code);
-    if (!room) throw new Error("Room not found.");
-    if (room.status !== "active") throw new Error("Match is not active.");
-
-    await settleTimeout(room);
-    if (room.status !== "active") return { valid: false, room: publicRoom(room) };
-
-    const currentTurnPlayer = room.players[room.turnIndex];
-    if (!currentTurnPlayer || currentTurnPlayer.id !== actor.id) {
-        throw new Error("Wait for your turn.");
-    }
-    currentTurnPlayer.lastSeenAt = Date.now();
-
     const clean = String(rawWord || "").normalize("NFKC").trim().toLowerCase();
-    const seq = String(room.sequence || "").toLowerCase();
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const room = await findRoomByCode(code);
+        if (!room) throw new Error("Room not found.");
+        if (room.status !== "active") {
+            return { valid: false, message: "Match is not active.", room: publicRoom(room) };
+        }
 
-    if (!/^[a-z]{3,64}$/.test(clean) || !clean.includes(seq) || (room.usedWords && room.usedWords.includes(clean)) || !hasWord(clean)) {
-        return { valid: false, message: "That word is not accepted for this sequence.", room: publicRoom(room) };
-    }
+        if (room.deadline && Date.now() > room.deadline + SUBMIT_GRACE_MS) {
+            await settleTimeout(room, 0);
+            const latest = await findRoomByCode(code);
+            return { valid: false, message: "Time expired!", room: publicRoom(latest || room) };
+        }
+
+        const currentTurnPlayer = room.players[room.turnIndex];
+        if (!currentTurnPlayer || currentTurnPlayer.id !== actor.id) {
+            return { valid: false, message: "Wait for your turn.", room: publicRoom(room) };
+        }
+
+        const seq = String(room.sequence || "").toLowerCase();
+        if (!/^[a-z]{3,64}$/.test(clean) || !clean.includes(seq) || (room.usedWords && room.usedWords.includes(clean)) || !hasWord(clean)) {
+            return { valid: false, message: "That word is not accepted for this sequence.", room: publicRoom(room) };
+        }
+        currentTurnPlayer.lastSeenAt = Date.now();
 
     // Word valid
     if (!room.usedWords) room.usedWords = [];
@@ -617,11 +654,17 @@ const submitWord = async (actor, code, rawWord) => {
     room.sequenceStartPlayerId = room.players[nextIdx]?.id || null;
     room.deadline = Date.now() + TURN_MS;
 
-    await saveRoom(room);
-    return { valid: true, gainedExtraLife, room: publicRoom(room) };
+        const saved = await saveRoomAtomic(room);
+        if (saved) {
+            return { valid: true, gainedExtraLife, room: publicRoom(room) };
+        }
+    }
+    const finalRoom = await findRoomByCode(code);
+    return { valid: false, message: "Turn already changed.", room: finalRoom ? publicRoom(finalRoom) : null };
 };
 
 const leaveRoom = async (actor, code) => {
+    for (let attempt = 0; attempt < 3; attempt++) {
     const room = await findRoomByCode(code);
     if (!room) return;
 
@@ -634,7 +677,8 @@ const leaveRoom = async (actor, code) => {
         if (room.hostId === actor.id) {
             room.hostId = room.players[0].id;
         }
-        await saveRoom(room);
+        if (await saveRoomAtomic(room)) return;
+        continue;
     } else if (room.status === "active") {
         const player = room.players.find((p) => p.id === actor.id);
         if (player) {
@@ -646,12 +690,13 @@ const leaveRoom = async (actor, code) => {
         }
         const alive = room.players.filter((p) => !p.eliminated && !p.left);
         if (alive.length <= 1) {
-            await finishMatch(room, alive[0] || null, "abandoned");
+            if (await finishMatch(room, alive[0] || null, "abandoned")) return;
+            continue;
         } else {
             if (room.players[room.turnIndex]?.id === actor.id) {
                 let nextIdx = (room.turnIndex + 1) % room.players.length;
                 while (room.players[nextIdx].eliminated || room.players[nextIdx].left) {
-                    nextIdx = (room.turnIndex + 1) % room.players.length;
+                    nextIdx = (nextIdx + 1) % room.players.length;
                 }
                 room.turnIndex = nextIdx;
                 room.round = (room.round || 1) + 1;
@@ -660,7 +705,8 @@ const leaveRoom = async (actor, code) => {
                 room.sequenceStartPlayerId = room.players[nextIdx]?.id || null;
                 room.deadline = Date.now() + TURN_MS;
             }
-            await saveRoom(room);
+            if (await saveRoomAtomic(room)) return;
+            continue;
         }
     } else if (room.status === "finished") {
         const player = room.players.find((p) => p.id === actor.id);
@@ -674,8 +720,11 @@ const leaveRoom = async (actor, code) => {
                 await deleteRoom(code);
                 return;
             }
-            await saveRoom(room);
+            if (await saveRoomAtomic(room)) return;
+            continue;
         }
+        return;
+    }
     }
 };
 module.exports = {
