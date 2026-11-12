@@ -199,6 +199,11 @@ const settleTimeout = async (room) => {
     const player = room.players[room.turnIndex];
     if (!player || player.eliminated) return false;
 
+    if (!Array.isArray(room.sequenceFailedIds)) room.sequenceFailedIds = [];
+    if (!room.sequenceFailedIds.includes(player.id)) {
+        room.sequenceFailedIds.push(player.id);
+    }
+
     player.lives -= 1;
     if (player.lives <= 0) {
         player.eliminated = true;
@@ -219,16 +224,75 @@ const settleTimeout = async (room) => {
     }
     room.turnIndex = nextIdx;
     room.round = (room.round || 1) + 1;
-    room.sequence = chooseSequence(room.recentSequences || []);
-    if (!room.recentSequences) room.recentSequences = [];
-    room.recentSequences.push(room.sequence);
-    if (room.recentSequences.length > 25) room.recentSequences.shift();
+
+    // Keep the same substring across players until every alive player in the cycle has failed it
+    const allAliveFailed = alive.every((p) => room.sequenceFailedIds.includes(p.id));
+    if (allAliveFailed) {
+        room.sequence = chooseSequence(room.recentSequences || []);
+        if (!room.recentSequences) room.recentSequences = [];
+        room.recentSequences.push(room.sequence);
+        if (room.recentSequences.length > 25) room.recentSequences.shift();
+        room.sequenceFailedIds = [];
+        room.sequenceStartPlayerId = room.players[nextIdx]?.id || null;
+    }
+
     room.deadline = Date.now() + TURN_MS;
     await saveRoom(room);
     return true;
 };
 
+const findHostedLobbyByActor = async (actorId) => {
+    const col = getRoomsCollection();
+    if (col) {
+        return await col.findOne({
+            game: "word-bomb",
+            mode: "multiplayer",
+            status: "lobby",
+            hostId: actorId,
+            expiresAt: { $gt: new Date() }
+        });
+    }
+    for (const r of memoryRooms.values()) {
+        if (r.game === "word-bomb" && r.mode === "multiplayer" && r.status === "lobby" && r.hostId === actorId) {
+            return r;
+        }
+    }
+    return null;
+};
+
+const leaveOtherLobbies = async (actor, keepCode = null) => {
+    const col = getRoomsCollection();
+    let joined = [];
+    if (col) {
+        joined = await col.find({
+            game: "word-bomb",
+            mode: "multiplayer",
+            status: "lobby",
+            "players.id": actor.id
+        }).toArray();
+    } else {
+        joined = Array.from(memoryRooms.values()).filter(
+            (r) => r.game === "word-bomb" && r.mode === "multiplayer" && r.status === "lobby" && r.players.some((p) => p.id === actor.id)
+        );
+    }
+    for (const r of joined) {
+        if (!keepCode || r.code !== keepCode) {
+            await leaveRoom(actor, r.code);
+        }
+    }
+};
+
 const createRoom = async (actor, isPublic = true) => {
+    const existingHosted = await findHostedLobbyByActor(actor.id);
+    if (existingHosted) {
+        existingHosted.isPublic = Boolean(isPublic);
+        existingHosted.expiresAt = new Date(Date.now() + 86400000);
+        await saveRoom(existingHosted);
+        await leaveOtherLobbies(actor, existingHosted.code);
+        return publicRoom(existingHosted);
+    }
+
+    await leaveOtherLobbies(actor);
     const code = await generateCode();
     const initialSeq = chooseSequence();
     const room = {
@@ -241,6 +305,8 @@ const createRoom = async (actor, isPublic = true) => {
         hostId: actor.id,
         sequence: initialSeq,
         recentSequences: [initialSeq],
+        sequenceStartPlayerId: actor.id,
+        sequenceFailedIds: [],
         round: 0,
         turnIndex: 0,
         deadline: null,
@@ -308,6 +374,25 @@ const getRoomState = async (code) => {
     return publicRoom(room);
 };
 
+const renameGuest = async (actor, code, rawUsername) => {
+    const room = await findRoomByCode(code);
+    if (!room) throw new Error("Room not found.");
+    if (room.status !== "lobby") throw new Error("You can only rename in the lobby before the match starts.");
+
+    const clean = String(rawUsername || "").trim().replace(/\s+/g, " ");
+    if (clean.length < 2 || clean.length > 15) {
+        throw new Error("Guest name must be 2-15 characters.");
+    }
+
+    const player = room.players.find((p) => p.id === actor.id);
+    if (!player) throw new Error("You are not in this lobby.");
+    if (!player.isGuest) throw new Error("Only guest players can rename in lobby.");
+
+    player.username = clean;
+    await saveRoom(room);
+    return publicRoom(room);
+};
+
 const startRoom = async (actor, code) => {
     const room = await findRoomByCode(code);
     if (!room) throw new Error("Room not found.");
@@ -319,6 +404,8 @@ const startRoom = async (actor, code) => {
 
     room.status = "active";
     room.sequence = chooseSequence(room.recentSequences || []);
+    room.sequenceFailedIds = [];
+    room.sequenceStartPlayerId = room.players[0]?.id || null;
     room.round = 1;
     room.turnIndex = 0;
     room.deadline = Date.now() + TURN_MS;
@@ -327,6 +414,54 @@ const startRoom = async (actor, code) => {
         p.eliminated = false;
         p.eliminatedOrder = 0;
         p.lives = START_LIVES;
+        p.alphabetUsed = [];
+        p.alphabetProgress = 0;
+        p.streak = 0;
+    }
+
+    await saveRoom(room);
+    return publicRoom(room);
+};
+
+const rematchRoom = async (actor, code) => {
+    const room = await findRoomByCode(code);
+    if (!room) throw new Error("Room not found.");
+    if (room.status === "active") return publicRoom(room);
+
+    const isHost = room.hostId === actor.id || room.players[0]?.id === actor.id;
+    if (!isHost) throw new Error("Only the host can restart the room.");
+
+    room._id = crypto.randomUUID();
+    room.winnerId = null;
+    room.finishReason = null;
+    room.xpAwarded = false;
+    room.usedWords = [];
+    room.eliminatedCount = 0;
+    room.sequenceFailedIds = [];
+    for (const p of room.players) {
+        p.eliminated = false;
+        p.eliminatedOrder = 0;
+        p.lives = START_LIVES;
+        p.alphabetUsed = [];
+        p.alphabetProgress = 0;
+        p.streak = 0;
+        p.xpEarned = 0;
+        p.xpSaved = false;
+        p.totalXp = null;
+    }
+
+    if (room.players.length >= 2) {
+        room.status = "active";
+        room.sequence = chooseSequence(room.recentSequences || []);
+        room.sequenceStartPlayerId = room.players[0]?.id || null;
+        room.round = 1;
+        room.turnIndex = 0;
+        room.deadline = Date.now() + TURN_MS;
+    } else {
+        room.status = "lobby";
+        room.round = 0;
+        room.turnIndex = 0;
+        room.deadline = null;
     }
 
     await saveRoom(room);
@@ -385,6 +520,8 @@ const submitWord = async (actor, code, rawWord) => {
     if (!room.recentSequences) room.recentSequences = [];
     room.recentSequences.push(room.sequence);
     if (room.recentSequences.length > 25) room.recentSequences.shift();
+    room.sequenceFailedIds = [];
+    room.sequenceStartPlayerId = room.players[nextIdx]?.id || null;
     room.deadline = Date.now() + TURN_MS;
 
     await saveRoom(room);
@@ -433,6 +570,8 @@ module.exports = {
     joinRoom,
     getRoomState,
     startRoom,
+    rematchRoom,
+    renameGuest,
     submitWord,
     leaveRoom,
     publicRoom

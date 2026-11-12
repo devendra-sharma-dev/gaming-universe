@@ -91,6 +91,7 @@ const getWordBombActor = async (req) => {
     if (session?.userId) {
         const skipUserLookup =
             req.path === "/word-bomb/room/start" ||
+            req.path === "/word-bomb/room/rematch" ||
             req.path === "/word-bomb/room/submit" ||
             req.path === "/word-bomb/room/leave";
         if (skipUserLookup) {
@@ -138,7 +139,7 @@ router.post(
         const actor = await getWordBombActor(request);
         const isPublic = request.body?.isPublic !== false;
         const room = await wordBombRooms.createRoom(actor, isPublic);
-        response.json({ success: true, data: { room } });
+        response.json({ success: true, data: { room, actor } });
     })
 );
 
@@ -149,7 +150,7 @@ router.post(
         const code = String(request.body?.code || "").trim().toUpperCase();
         try {
             const room = await wordBombRooms.joinRoom(actor, code);
-            response.json({ success: true, data: { room } });
+            response.json({ success: true, data: { room, actor } });
         } catch (err) {
             response.status(400).json({
                 success: false,
@@ -194,6 +195,34 @@ router.post(
         try {
             const result = await wordBombRooms.submitWord(actor, code, word);
             response.json({ success: true, data: result });
+        } catch (err) {
+            response.status(400).json({ success: false, error: { message: err.message } });
+        }
+    })
+);
+
+router.post(
+    "/word-bomb/room/rename",
+    asyncRoute(async (request, response) => {
+        const actor = await getWordBombActor(request);
+        const code = String(request.body?.code || "").trim().toUpperCase();
+        try {
+            const room = await wordBombRooms.renameGuest(actor, code, request.body?.username);
+            response.json({ success: true, data: { room } });
+        } catch (err) {
+            response.status(400).json({ success: false, error: { message: err.message } });
+        }
+    })
+);
+
+router.post(
+    "/word-bomb/room/rematch",
+    asyncRoute(async (request, response) => {
+        const actor = await getWordBombActor(request);
+        const code = String(request.body?.code || "").trim().toUpperCase();
+        try {
+            const room = await wordBombRooms.rematchRoom(actor, code);
+            response.json({ success: true, data: { room } });
         } catch (err) {
             response.status(400).json({ success: false, error: { message: err.message } });
         }

@@ -88,6 +88,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     let localDictionarySet = null;
     let dictionaryLoadPromise = null;
     let isSubmittingWord = false;
+    let isCreatingRoom = false;
+    let isJoiningRoom = false;
+    let isPollingRoom = false;
+    let shownFinishMatchId = null;
     let lastRenderedFingerprint = "";
 
     const loadLocalDictionary = () => {
@@ -302,13 +306,49 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     // Guest rename in lobby before match starts
-    const handleGuestRename = () => {
-        const newName = (guestRenameInput?.value || "").trim();
+    const handleGuestRename = async () => {
+        const newName = (guestRenameInput?.value || "").trim().replace(/\s+/g, " ");
         if (!newName || newName.length < 2 || newName.length > 15) {
             if (message) message.textContent = "Guest name must be 2-15 characters.";
+            if (feed) feed.textContent = "✕ Guest name must be 2-15 characters.";
             return;
         }
-        socket.emit("word-bomb:rename-guest", { username: newName });
+        try {
+            window.sessionStorage.setItem("gaming_universe_wb_guest_name", newName);
+        } catch {}
+
+        if (room?.code && room.status === "lobby") {
+            if (guestRenameBtn) guestRenameBtn.disabled = true;
+            try {
+                const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/rename`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ code: room.code, username: newName })
+                });
+                const body = await res.json();
+                if (res.ok && body.data?.room) {
+                    if (identity) identity.username = newName;
+                    $("word-bomb-identity").textContent = guestXp > 0
+                        ? `${newName} • ${guestXp} XP (UNSAVED)`
+                        : newName;
+                    if (guestRenameInput) guestRenameInput.value = newName;
+                    if (message) message.textContent = `Name updated to ${newName}!`;
+                    if (feed) feed.textContent = "";
+                    render(body.data.room);
+                    return;
+                }
+                if (feed) feed.textContent = `✕ ${body.error?.message || "Could not rename."}`;
+            } catch (_e) {
+                if (feed) feed.textContent = "✕ Could not rename right now.";
+            } finally {
+                if (guestRenameBtn) guestRenameBtn.disabled = false;
+            }
+            return;
+        }
+
+        if (socket.connected) {
+            socket.emit("word-bomb:rename-guest", { username: newName });
+        }
     };
 
     guestRenameBtn?.addEventListener("click", handleGuestRename);
@@ -394,7 +434,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const getRoomRenderFingerprint = (r) => {
         if (!r) return "";
-        const playersKey = (r.players || []).map((p) => `${p.id}:${p.lives}:${p.eliminated ? 1 : 0}:${(p.alphabetProgress || p.alphabetUsed || []).length}:${p.username}`).join(",");
+        const playersKey = (r.players || []).map((p) => {
+            const alphaLen = Array.isArray(p.alphabetUsed)
+                ? p.alphabetUsed.length
+                : (Array.isArray(p.alphabetProgress) ? p.alphabetProgress.length : Number(p.alphabetProgress) || 0);
+            return `${p.id}:${p.lives}:${p.eliminated ? 1 : 0}:${alphaLen}:${p.username}`;
+        }).join(",");
         return `${r.code || ""}:${r.mode}:${r.status}:${r.round}:${r.sequence}:${r.turnPlayerId}:${r.deadline}:${r.winnerId || ""}:${playersKey}`;
     };
 
@@ -674,8 +719,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         // Update A-Z Alphabet Tracker for current viewing user
         const me = roster.find((p) => p.id === identity?.id) || roster[0];
-        const usedLetters = me?.alphabetProgress || me?.alphabetUsed || [];
+        const usedLetters = Array.isArray(me?.alphabetUsed)
+            ? me.alphabetUsed
+            : (Array.isArray(me?.alphabetProgress) ? me.alphabetProgress : []);
         const usedSet = new Set(usedLetters.map((c) => String(c).toLowerCase()));
+        if (alphabetBadge) {
+            alphabetBadge.textContent = `${usedSet.size}/26 LETTERS`;
+        }
         if (alphabetGrid) {
             alphabetGrid.querySelectorAll(".alpha-chip").forEach((chip) => {
                 const letter = chip.getAttribute("data-letter");
@@ -685,6 +735,25 @@ document.addEventListener("DOMContentLoaded", async () => {
                     chip.classList.remove("is-used");
                 }
             });
+        }
+
+        if (isActive || isLobby) {
+            shownFinishMatchId = null;
+        } else if (next.status === "finished" && !isSolo) {
+            stopRoomPolling();
+            const finishKey = next.matchId || `${next.code}:${next.round}`;
+            if (shownFinishMatchId !== finishKey) {
+                shownFinishMatchId = finishKey;
+                const winner = roster.find((p) => p.id === next.winnerId);
+                showFinishModal({
+                    matchId: next.matchId,
+                    mode: "multiplayer",
+                    reason: next.finishReason || "last-player",
+                    winner,
+                    wordsCount: next.usedWords?.length || 0,
+                    players: next.players
+                });
+            }
         }
     };
 
@@ -705,12 +774,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                 stopRoomPolling();
                 return;
             }
-            if (isSubmittingWord) return;
-            const _pollSkipCheckDone = true;
-            if (false) {
-                stopRoomPolling();
-                return;
-            }
+            if (isSubmittingWord || isPollingRoom) return;
+            isPollingRoom = true;
             try {
                 const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/${code}`);
                 if (res.ok) {
@@ -720,25 +785,13 @@ document.addEventListener("DOMContentLoaded", async () => {
                         if (room && typeof nextRoom.round === "number" && typeof room.round === "number" && nextRoom.status === "active" && room.status === "active" && nextRoom.round < room.round) {
                             return;
                         }
-                        if (nextRoom.status === "finished" && room.status !== "finished") {
-                            stopRoomPolling();
-                            render(nextRoom);
-                            const winner = nextRoom.players.find(p => p.id === nextRoom.winnerId);
-                            showFinishModal({
-                                matchId: nextRoom.matchId,
-                                mode: "multiplayer",
-                                reason: nextRoom.finishReason || "last-player",
-                                winner,
-                                wordsCount: nextRoom.usedWords?.length || 0,
-                                players: nextRoom.players
-                            });
-                            return;
-                        }
                         render(nextRoom);
                     }
                 }
-            } catch (_e) {}
-        }, 1000);
+            } catch (_e) {} finally {
+                isPollingRoom = false;
+            }
+        }, 450);
     };
 
     const fetchPublicLobbies = async () => {
@@ -752,6 +805,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
 
     const createMultiplayerRoom = async (isPublic) => {
+        if (isCreatingRoom) return;
+        isCreatingRoom = true;
+        const createBtn = $("word-bomb-create");
+        if (createBtn) createBtn.disabled = true;
         localSoloActive = false;
         showLobbyNotice("Creating arena room...");
         try {
@@ -762,24 +819,29 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
             const body = await res.json();
             if (res.ok && body.data?.room) {
+                if (body.data.actor && (!identity || identity.isGuest)) {
+                    identity = body.data.actor;
+                }
                 if (lobbiesNotice) {
                     lobbiesNotice.hidden = true;
                     lobbiesNotice.style.display = "none";
                 }
                 render(body.data.room);
                 startRoomPolling(body.data.room.code);
-                if (socket.connected) {
-                    // REST room active; avoid duplicate socket room creation
-                }
                 return;
             }
             throw new Error(body.error?.message || "Failed to create room.");
         } catch (err) {
             showLobbyNotice(err.message || "Failed to create arena room.");
+        } finally {
+            isCreatingRoom = false;
+            if (createBtn) createBtn.disabled = false;
         }
     };
 
     const joinMultiplayerRoom = async (code) => {
+        if (isJoiningRoom) return;
+        isJoiningRoom = true;
         localSoloActive = false;
         showJoinCodeNotice("Joining arena room...");
         try {
@@ -790,15 +852,15 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
             const body = await res.json();
             if (res.ok && body.data?.room) {
+                if (body.data.actor && (!identity || identity.isGuest)) {
+                    identity = body.data.actor;
+                }
                 if (joinCodeNotice) {
                     joinCodeNotice.hidden = true;
                     joinCodeNotice.style.display = "none";
                 }
                 render(body.data.room);
                 startRoomPolling(body.data.room.code);
-                if (socket.connected) {
-                    // REST room active; avoid duplicate socket room join
-                }
                 return;
             }
             if (body.error?.isFull) {
@@ -808,6 +870,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
         } catch (err) {
             showJoinCodeNotice(err.message || "Could not join room.");
+        } finally {
+            isJoiningRoom = false;
         }
     };
 
@@ -844,34 +908,22 @@ document.addEventListener("DOMContentLoaded", async () => {
         input?.focus();
     };
 
-    const finishLocalSolo = async (reason) => {
+    const finishLocalSolo = (reason) => {
         clearInterval(timerId);
         localSoloActive = false;
         const soloCount = room?.usedWords?.length || 0;
         recordSoloScore(soloCount);
 
         const myXpEarned = Math.floor(soloCount / 5) * 10;
-        let totalXp = null;
+        const matchId = "local-" + Date.now();
 
-        if (identity && !identity.isGuest && myXpEarned > 0) {
-            try {
-                const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/award-xp`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ xpEarned: myXpEarned })
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    totalXp = data?.data?.totalXp;
-                }
-            } catch {}
-        } else if (identity?.isGuest && myXpEarned > 0) {
+        if (identity?.isGuest && myXpEarned > 0) {
             guestXp += myXpEarned;
             $("word-bomb-identity").textContent = `${identity?.username || "GUEST"} • ${guestXp} XP (UNSAVED)`;
         }
 
         showFinishModal({
-            matchId: "local-" + Date.now(),
+            matchId,
             mode: "solo",
             reason,
             winner: null,
@@ -883,9 +935,25 @@ document.addEventListener("DOMContentLoaded", async () => {
                 lives: 0,
                 eliminated: true,
                 xpEarned: myXpEarned,
-                totalXp
+                totalXp: null
             }]
         });
+
+        if (identity && !identity.isGuest && myXpEarned > 0) {
+            window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/award-xp`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ xpEarned: myXpEarned })
+            })
+                .then((res) => (res.ok ? res.json() : null))
+                .then((data) => {
+                    const totalXp = data?.data?.totalXp;
+                    if (totalXp !== null && totalXp !== undefined && modalTotalXp && !modal.hidden) {
+                        modalTotalXp.textContent = `TOTAL PLATFORM XP: ${totalXp}`;
+                    }
+                })
+                .catch(() => {});
+        }
     };
 
     // Button Actions
@@ -1095,6 +1163,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (feed) feed.textContent = "";
         if (room?.code) {
+            let accepted = false;
             try {
                 const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/submit`, {
                     method: "POST",
@@ -1103,7 +1172,16 @@ document.addEventListener("DOMContentLoaded", async () => {
                 });
                 const body = await res.json();
                 if (res.ok && body.data?.valid) {
+                    accepted = true;
                     if (feed) feed.textContent = "";
+                    if (body.data.gainedExtraLife && alphabetStatus) {
+                        alphabetStatus.textContent = "⭐ +1 EXTRA LIFE! A–Z COMPLETED!";
+                        alphabetStatus.classList.add("is-bonus");
+                        setTimeout(() => {
+                            alphabetStatus?.classList.remove("is-bonus");
+                            if (alphabetStatus) alphabetStatus.textContent = "26 LETTERS REMAINING FOR +1 LIFE";
+                        }, 3500);
+                    }
                     render(body.data.room);
                     input.value = "";
                 } else {
@@ -1113,15 +1191,17 @@ document.addEventListener("DOMContentLoaded", async () => {
                     arena?.classList.add("arena-shake");
                     setTimeout(() => arena?.classList.remove("arena-shake"), 600);
                 }
-            } catch (_e) {}
-        }
-        isSubmittingWord = false;
-        if (room?.code) {
-            if (room === submittedRoom && room.status === "active" && !input.value) {
+            } catch (_e) {} finally {
+                isSubmittingWord = false;
+            }
+            if (!accepted && room === submittedRoom && room.status === "active" && !input.value) {
                 input.value = word;
                 input.select();
             }
-        } else if (socket.connected) {
+            return;
+        }
+        isSubmittingWord = false;
+        if (socket.connected) {
             socket.emit("word-bomb:submit", { word });
         }
         input.select();
@@ -1145,6 +1225,29 @@ document.addEventListener("DOMContentLoaded", async () => {
             } else {
                 currentUser = null;
                 playerStatusDot?.classList.remove("is-active");
+                window.GamingSession.socketAuth(({ browserToken }) => {
+                    if (identity && !identity.isGuest) return;
+                    let savedName = "";
+                    try {
+                        savedName = (window.sessionStorage.getItem("gaming_universe_wb_guest_name") || "").trim();
+                    } catch {}
+                    const fallbackName = savedName || (browserToken ? `Guest${browserToken.slice(0, 6).toUpperCase()}` : "GUEST");
+                    identity = {
+                        id: browserToken ? `guest:${browserToken.slice(0, 16)}` : "",
+                        username: fallbackName,
+                        isGuest: true
+                    };
+                    $("word-bomb-identity").textContent = guestXp > 0
+                        ? `${identity.username} • ${guestXp} XP (UNSAVED)`
+                        : identity.username;
+                    if (room && room.status === "lobby" && guestRenameBar) {
+                        guestRenameBar.hidden = false;
+                        guestRenameBar.style.display = "flex";
+                        if (guestRenameInput && !guestRenameInput.value) {
+                            guestRenameInput.value = identity.username;
+                        }
+                    }
+                });
             }
         })
         .catch(() => {});
@@ -1866,14 +1969,38 @@ document.addEventListener("DOMContentLoaded", async () => {
                 const isHost = Boolean(identity && (room?.hostId === identity.id || room?.players[0]?.id === identity.id));
                 if (isHost) {
                     modalPlayAgain.textContent = "REPLAY ROOM 🔁";
-                    modalPlayAgain.onclick = () => {
+                    modalPlayAgain.onclick = async () => {
                         modal.hidden = true;
                         modal.style.display = "none";
+                        if (room?.code) {
+                            try {
+                                const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/rematch`, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ code: room.code })
+                                });
+                                const body = await res.json();
+                                if (res.ok && body.data?.room) {
+                                    render(body.data.room);
+                                    startRoomPolling(body.data.room.code);
+                                }
+                            } catch (_e) {}
+                            return;
+                        }
                         socket.emit("word-bomb:rematch");
                     };
                 } else {
                     modalPlayAgain.textContent = "REQUEST REPLAY 🔁";
                     modalPlayAgain.onclick = () => {
+                        if (room?.code) {
+                            modalPlayAgain.disabled = true;
+                            modalPlayAgain.textContent = "WAITING FOR HOST TO REPLAY...";
+                            if (modalSubtitle) {
+                                modalSubtitle.textContent = `You're ready! Waiting for the host (@${room?.hostUsername || "host"}) to restart the room...`;
+                            }
+                            startRoomPolling(room.code);
+                            return;
+                        }
                         socket.emit("word-bomb:rematch");
                         modalPlayAgain.disabled = true;
                         modalPlayAgain.textContent = "WAITING FOR HOST TO REPLAY...";
