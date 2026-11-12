@@ -110,6 +110,8 @@ const publicRoom = (room) => {
         round: room.round,
         turnPlayerId: room.players[room.turnIndex]?.id || null,
         deadline: room.deadline,
+        serverNow: Date.now(),
+        timeRemainingMs: room.deadline ? Math.max(0, room.deadline - Date.now()) : 0,
         usedWords: (room.usedWords || []).slice(-50),
         winnerId: room.winnerId,
         hostId: room.hostId || room.players[0]?.id || null,

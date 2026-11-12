@@ -91,7 +91,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     let isCreatingRoom = false;
     let isJoiningRoom = false;
     let isPollingRoom = false;
+    let roomEpoch = 0;
+    let activeRoomCode = null;
     let shownFinishMatchId = null;
+    let lastLivesMatchKey = "";
+    let lastPlayerLives = new Map();
     let lastRenderedFingerprint = "";
 
     const loadLocalDictionary = () => {
@@ -451,6 +455,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         lastRenderedFingerprint = nextFingerprint;
         room = next;
+        if (next && next.code && next.mode !== "solo") {
+            activeRoomCode = next.code;
+        }
         const roster = next.players || [];
         const isSolo = next.mode === "solo";
         const isActive = next.status === "active";
@@ -666,15 +673,44 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
         };
 
-        // Timer countdown
+        // Trigger blast animation in multiplayer whenever a player loses a life
+        if (!isSolo && next.code) {
+            const livesMatchKey = `${next.code}:${next.matchId || ""}`;
+            if (lastLivesMatchKey !== livesMatchKey) {
+                lastLivesMatchKey = livesMatchKey;
+                lastPlayerLives = new Map(roster.map((p) => [p.id, Number(p.lives) || 0]));
+            } else {
+                let lifeLost = false;
+                for (const p of roster) {
+                    const prevLives = lastPlayerLives.get(p.id);
+                    const currLives = Number(p.lives) || 0;
+                    if (typeof prevLives === "number" && currLives < prevLives) {
+                        lifeLost = true;
+                    }
+                    lastPlayerLives.set(p.id, currLives);
+                }
+                if (lifeLost) {
+                    arena?.classList.remove("arena-blast", "arena-shake");
+                    void arena?.offsetWidth;
+                    arena?.classList.add("arena-blast", "arena-shake");
+                    setTimeout(() => arena?.classList.remove("arena-blast", "arena-shake"), 900);
+                }
+            }
+        }
+
+        // Timer countdown (clock-skew-free using server timeRemainingMs when available)
         clearInterval(timerId);
         if (isActive) {
-            const initialRemain = Math.max(0, (next.deadline - Date.now()) / 1000);
+            const effectiveDeadline = (!isSolo && typeof next.timeRemainingMs === "number")
+                ? (Date.now() + next.timeRemainingMs)
+                : next.deadline;
+            const initialRemain = Math.max(0, (effectiveDeadline - Date.now()) / 1000);
             if (timer) timer.textContent = initialRemain.toFixed(1);
             updateBombUrgency(initialRemain);
 
+            let timeoutSettleTriggered = false;
             timerId = setInterval(() => {
-                const remain = Math.max(0, (next.deadline - Date.now()) / 1000);
+                const remain = Math.max(0, (effectiveDeadline - Date.now()) / 1000);
                 if (timer) timer.textContent = remain.toFixed(1);
                 updateBombUrgency(remain);
 
@@ -697,6 +733,26 @@ document.addEventListener("DOMContentLoaded", async () => {
                             room.deadline = Date.now() + 20000;
                             render(room);
                         }
+                    } else if (!localSoloActive && room?.code && room.status === "active" && !timeoutSettleTriggered) {
+                        timeoutSettleTriggered = true;
+                        const settleRound = room.round;
+                        const settleCode = room.code;
+                        const settleEpoch = roomEpoch;
+                        pollRoomOnce(settleCode, settleEpoch).then((updated) => {
+                            if (
+                                settleEpoch === roomEpoch &&
+                                room?.code === settleCode &&
+                                room.status === "active" &&
+                                room.round === settleRound &&
+                                (!updated || updated.round === settleRound)
+                            ) {
+                                setTimeout(() => {
+                                    if (settleEpoch === roomEpoch && room?.code === settleCode && room.status === "active") {
+                                        pollRoomOnce(settleCode, settleEpoch);
+                                    }
+                                }, 140);
+                            }
+                        });
                     }
                 }
             }, 100);
@@ -766,31 +822,45 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     };
 
+    const pollRoomOnce = async (code, expectedEpoch = roomEpoch) => {
+        if (!room || room.code !== code || activeRoomCode !== code || room.mode === "solo" || expectedEpoch !== roomEpoch) {
+            return null;
+        }
+        if (isSubmittingWord || isPollingRoom) return null;
+        isPollingRoom = true;
+        try {
+            const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/${code}`, { cache: "no-store" });
+            if (expectedEpoch !== roomEpoch || !room || room.code !== code || activeRoomCode !== code) {
+                return null;
+            }
+            if (res.ok) {
+                const body = await res.json();
+                const nextRoom = body.data?.room;
+                if (nextRoom) {
+                    if (expectedEpoch !== roomEpoch || activeRoomCode !== code) return null;
+                    if (room && typeof nextRoom.round === "number" && typeof room.round === "number" && nextRoom.status === "active" && room.status === "active" && nextRoom.round < room.round) {
+                        return null;
+                    }
+                    render(nextRoom);
+                    return nextRoom;
+                }
+            }
+        } catch (_e) {} finally {
+            isPollingRoom = false;
+        }
+        return null;
+    };
+
     const startRoomPolling = (code) => {
         stopRoomPolling();
-        roomPollTimer = setInterval(async () => {
-            if (!room || room.code !== code || room.mode === "solo") {
+        const epoch = roomEpoch;
+        roomPollTimer = setInterval(() => {
+            if (!room || room.code !== code || activeRoomCode !== code || room.mode === "solo" || epoch !== roomEpoch) {
                 stopRoomPolling();
                 return;
             }
-            if (isSubmittingWord || isPollingRoom) return;
-            isPollingRoom = true;
-            try {
-                const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/${code}`, { cache: "no-store" });
-                if (res.ok) {
-                    const body = await res.json();
-                    const nextRoom = body.data?.room;
-                    if (nextRoom) {
-                        if (room && typeof nextRoom.round === "number" && typeof room.round === "number" && nextRoom.status === "active" && room.status === "active" && nextRoom.round < room.round) {
-                            return;
-                        }
-                        render(nextRoom);
-                    }
-                }
-            } catch (_e) {} finally {
-                isPollingRoom = false;
-            }
-        }, 450);
+            pollRoomOnce(code, epoch);
+        }, 400);
     };
 
     const fetchPublicLobbies = async () => {
@@ -806,6 +876,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const createMultiplayerRoom = async (isPublic) => {
         if (isCreatingRoom) return;
         isCreatingRoom = true;
+        roomEpoch += 1;
+        const epoch = roomEpoch;
         const createBtn = $("word-bomb-create");
         if (createBtn) createBtn.disabled = true;
         localSoloActive = false;
@@ -817,6 +889,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 body: JSON.stringify({ isPublic, username: identity?.username })
             });
             const body = await res.json();
+            if (epoch !== roomEpoch) return;
             if (res.ok && body.data?.room) {
                 if (body.data.actor && (!identity || identity.isGuest)) {
                     identity = body.data.actor;
@@ -825,6 +898,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     lobbiesNotice.hidden = true;
                     lobbiesNotice.style.display = "none";
                 }
+                activeRoomCode = body.data.room.code;
                 render(body.data.room);
                 startRoomPolling(body.data.room.code);
                 return;
@@ -841,6 +915,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const joinMultiplayerRoom = async (code) => {
         if (isJoiningRoom) return;
         isJoiningRoom = true;
+        roomEpoch += 1;
+        const epoch = roomEpoch;
         localSoloActive = false;
         showJoinCodeNotice("Joining arena room...");
         try {
@@ -850,6 +926,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 body: JSON.stringify({ code, username: identity?.username })
             });
             const body = await res.json();
+            if (epoch !== roomEpoch) return;
             if (res.ok && body.data?.room) {
                 if (body.data.actor && (!identity || identity.isGuest)) {
                     identity = body.data.actor;
@@ -858,6 +935,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     joinCodeNotice.hidden = true;
                     joinCodeNotice.style.display = "none";
                 }
+                activeRoomCode = body.data.room.code;
                 render(body.data.room);
                 startRoomPolling(body.data.room.code);
                 return;
@@ -1001,30 +1079,42 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!room?.code && socket.connected) socket.emit("word-bomb:start-room");
     });
 
-    // Leave button: Immediately leaves room cleanly with NO browser confirm/toast dialog!
-    exitBtn?.addEventListener("click", () => {
+    const leaveActiveRoom = () => {
+        const leavingCode = room?.code || activeRoomCode;
+        roomEpoch += 1;
+        activeRoomCode = null;
         stopRoomPolling();
-        if (localSoloActive) {
-            clearInterval(timerId);
-            localSoloActive = false;
-        }
-        if (room?.code) {
-            window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/leave`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ code: room.code })
-            }).catch(() => {});
-        }
-        if (socket.connected) socket.emit("word-bomb:leave");
+        clearInterval(timerId);
+        localSoloActive = false;
+        isSubmittingWord = false;
+        isPollingRoom = false;
+        lastRenderedFingerprint = "";
+        shownFinishMatchId = null;
+        lastLivesMatchKey = "";
+        lastPlayerLives = new Map();
         room = null;
         if (feed) feed.textContent = "";
-        setScreen("landing");
         if (modal) {
             modal.hidden = true;
             modal.style.display = "none";
         }
-        fetchPublicLobbies();
-    });
+        setScreen("landing");
+        if (socket.connected) socket.emit("word-bomb:leave");
+        if (leavingCode) {
+            window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/leave`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code: leavingCode })
+            })
+                .then(() => fetchPublicLobbies())
+                .catch(() => fetchPublicLobbies());
+        } else {
+            fetchPublicLobbies();
+        }
+    };
+
+    // Leave button: Immediately leaves room cleanly with NO browser confirm/toast dialog!
+    exitBtn?.addEventListener("click", leaveActiveRoom);
 
     // Clear error message when user starts typing a new word
     input?.addEventListener("input", () => {
@@ -1733,7 +1823,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     socket.on("word-bomb:state", ({ room: next }) => {
-        // If current user is not in the room roster, they have left and shouldn't be pulled in
+        // If current user is not in an active room or not in the roster, ignore stale broadcasts
+        if (!activeRoomCode || (next?.code && next.code !== activeRoomCode)) {
+            return;
+        }
         if (identity && next && !next.players.some((p) => p.id === identity.id)) {
             return;
         }
@@ -2014,22 +2107,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         if (modalClose) {
-            modalClose.onclick = () => {
-                modal.hidden = true;
-                modal.style.display = "none";
-                stopRoomPolling();
-                lastRenderedFingerprint = "";
-                if (room?.code) {
-                    window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/leave`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ code: room.code })
-                    }).catch(() => {});
-                }
-                if (socket.connected) socket.emit("word-bomb:leave");
-                room = null;
-                setScreen("landing");
-            };
+            modalClose.onclick = leaveActiveRoom;
         }
 
         modal.hidden = false;
