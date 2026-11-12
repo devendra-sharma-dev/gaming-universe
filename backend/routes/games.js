@@ -128,6 +128,7 @@ const getWordBombActor = async (req) => {
 router.get(
     "/word-bomb/lobbies",
     asyncRoute(async (_request, response) => {
+        response.setHeader("Cache-Control", "no-store");
         const lobbies = await wordBombRooms.getActiveLobbies();
         response.json({ success: true, data: { lobbies } });
     })
@@ -163,6 +164,7 @@ router.post(
 router.get(
     "/word-bomb/room/:code",
     asyncRoute(async (request, response) => {
+        response.setHeader("Cache-Control", "no-store");
         const code = String(request.params?.code || "").trim().toUpperCase();
         const room = await wordBombRooms.getRoomState(code);
         if (!room) {
