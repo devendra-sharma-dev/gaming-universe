@@ -91,6 +91,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     let isCreatingRoom = false;
     let isJoiningRoom = false;
     let isPollingRoom = false;
+    let consecutive404Count = 0;
+    let exitedEpoch = -1;
     let roomEpoch = 0;
     let activeRoomCode = null;
     let shownFinishMatchId = null;
@@ -895,6 +897,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 return null;
             }
             if (res.ok) {
+                consecutive404Count = 0;
                 const body = await res.json();
                 const nextRoom = body.data?.room;
                 if (nextRoom) {
@@ -906,7 +909,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                     return nextRoom;
                 }
             } else if (res.status === 404) {
-                leaveActiveRoom();
+                consecutive404Count += 1;
+                if (consecutive404Count >= 3) {
+                    leaveActiveRoom({ skipServerLeave: true });
+                }
             }
         } catch (_e) {} finally {
             if (timeoutHandle) clearTimeout(timeoutHandle);
@@ -1148,8 +1154,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!room?.code && socket.connected) socket.emit("word-bomb:start-room");
     });
 
-    const leaveActiveRoom = () => {
+    const leaveActiveRoom = (options = {}) => {
+        const skipServerLeave = options && options.skipServerLeave === true;
         const leavingCode = room?.code || activeRoomCode;
+        exitedEpoch = roomEpoch;
         roomEpoch += 1;
         activeRoomCode = null;
         stopRoomPolling();
@@ -1157,6 +1165,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         localSoloActive = false;
         isSubmittingWord = false;
         isPollingRoom = false;
+        consecutive404Count = 0;
         lastRenderedFingerprint = "";
         shownFinishMatchId = null;
         lastLivesMatchKey = "";
@@ -1169,7 +1178,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         setScreen("landing");
         if (socket.connected) socket.emit("word-bomb:leave");
-        if (leavingCode) {
+        if (leavingCode && !skipServerLeave) {
             window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/leave`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -1186,9 +1195,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     exitBtn?.addEventListener("click", leaveActiveRoom);
 
     // Ensure closing browser/tab disconnects player from active lobby or match
-    const handlePageExit = () => {
+    const handlePageExit = (event) => {
+        if (event && event.persisted) return;
+        if (exitedEpoch === roomEpoch) return;
         const leavingCode = room?.code || activeRoomCode;
         if (!leavingCode) return;
+        exitedEpoch = roomEpoch;
         window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/leave`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1337,7 +1349,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
 
-        if (feed) feed.textContent = "";
         if (room?.code) {
             let accepted = false;
             const submitController = typeof AbortController === "function" ? new AbortController() : null;
@@ -1349,9 +1360,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                     body: JSON.stringify({ code: room.code, word }),
                     signal: submitController?.signal
                 });
-                const body = await res.json();
+                const body = await res.json().catch(() => null);
                 if (submitEpoch !== roomEpoch || !activeRoomCode) return;
-                if (res.ok && body.data?.valid) {
+                if (res.ok && body?.data?.valid) {
                     accepted = true;
                     if (feed) feed.textContent = "";
                     if (body.data.gainedExtraLife && alphabetStatus) {
@@ -1365,7 +1376,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                     render(body.data.room);
                     input.value = "";
                 } else {
-                    if (feed) feed.textContent = `✕ ${body.data?.message || body.error?.message || "That word is not accepted."}`;
+                    if (body?.data?.room) {
+                        render(body.data.room);
+                    }
+                    if (feed) feed.textContent = `✕ ${body?.data?.message || body?.error?.message || (res.ok ? "That word is not accepted." : "Network error submitting word. Please retry.")}`;
                     arena?.classList.remove("arena-shake");
                     void arena?.offsetWidth;
                     arena?.classList.add("arena-shake");
@@ -1376,8 +1390,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             } finally {
                 if (submitTimeout) clearTimeout(submitTimeout);
                 isSubmittingWord = false;
+                if (!accepted && submitEpoch === roomEpoch && activeRoomCode) {
+                    pollRoomOnce(activeRoomCode, submitEpoch);
+                }
             }
-            if (!accepted && room === submittedRoom && room.status === "active" && !input.value) {
+            if (!accepted && room && room.status === "active" && room.round === submittedRoom.round && !input.value) {
                 input.value = word;
                 input.select();
             }
