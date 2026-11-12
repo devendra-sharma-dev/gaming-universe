@@ -75,6 +75,16 @@ router.get("/word-bomb/dictionary", (_request, response) => {
     response.sendFile(file);
 });
 
+router.get("/word-bomb/substrings", (_request, response) => {
+    const path = require("path");
+    const file = path.resolve(__dirname, "../../data/wordBombSubstrings.json");
+    if (!require("fs").existsSync(file)) {
+        return response.status(404).json({ success: false, error: { message: "Substrings unavailable." } });
+    }
+    response.setHeader("Cache-Control", "public, max-age=86400");
+    response.sendFile(file);
+});
+
 
 const wordBombRooms = require("../services/wordBombRooms");
 
@@ -166,7 +176,8 @@ router.get(
     asyncRoute(async (request, response) => {
         response.setHeader("Cache-Control", "no-store");
         const code = String(request.params?.code || "").trim().toUpperCase();
-        const room = await wordBombRooms.getRoomState(code);
+        const graceMs = request.query?.settle === "1" ? 250 : 0;
+        const room = await wordBombRooms.getRoomState(code, graceMs);
         if (!room) {
             return response.status(404).json({ success: false, error: { message: "Room not found." } });
         }
@@ -247,21 +258,55 @@ router.post(
     "/word-bomb/award-xp",
     asyncRoute(async (request, response) => {
         const xpEarned = parseInt(request.body?.xpEarned, 10) || 0;
-        if (xpEarned <= 0) {
+        const soloScore = Math.max(0, Math.min(parseInt(request.body?.soloScore, 10) || 0, 100000));
+        const validXp = xpEarned > 0 ? Math.min(xpEarned, 1000) : 0;
+        if (validXp <= 0 && soloScore <= 0) {
             return response.json({
                 success: true,
-                data: { xpEarned: 0, totalXp: request.user.xp }
+                data: {
+                    xpEarned: 0,
+                    totalXp: request.user.xp,
+                    wordBombHighScore: request.user.wordBombHighScore || 0
+                }
             });
         }
-        const validXp = Math.min(xpEarned, 1000);
+        const update = {};
+        if (validXp > 0) update.$inc = { xp: validXp };
+        if (soloScore > 0) update.$max = { wordBombHighScore: soloScore };
         const user = await User.findByIdAndUpdate(
             request.user._id,
-            { $inc: { xp: validXp } },
+            update,
             { new: true }
-        ).select("xp username");
+        ).select("xp username wordBombHighScore");
         response.json({
             success: true,
-            data: { xpEarned: validXp, totalXp: user ? user.xp : (request.user.xp + validXp) }
+            data: {
+                xpEarned: validXp,
+                totalXp: user ? user.xp : (request.user.xp + validXp),
+                wordBombHighScore: user ? (user.wordBombHighScore || 0) : Math.max(request.user.wordBombHighScore || 0, soloScore)
+            }
+        });
+    })
+);
+
+router.post(
+    "/word-bomb/solo-score",
+    asyncRoute(async (request, response) => {
+        const score = Math.max(0, Math.min(parseInt(request.body?.score, 10) || 0, 100000));
+        if (score <= 0) {
+            return response.json({
+                success: true,
+                data: { wordBombHighScore: request.user.wordBombHighScore || 0 }
+            });
+        }
+        const user = await User.findByIdAndUpdate(
+            request.user._id,
+            { $max: { wordBombHighScore: score } },
+            { new: true }
+        ).select("wordBombHighScore");
+        response.json({
+            success: true,
+            data: { wordBombHighScore: user ? (user.wordBombHighScore || 0) : Math.max(request.user.wordBombHighScore || 0, score) }
         });
     })
 );

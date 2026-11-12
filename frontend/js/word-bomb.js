@@ -142,12 +142,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
     loadLocalDictionary();
     let localSoloRecentSequences = [];
-    const localSubstrings = {
+    let localSubstrings = {
         2: ["AT", "AN", "IN", "ER", "RE", "ST", "ON", "OU", "EA", "AR", "CO", "DE", "EN", "ES", "LA", "MA", "NE", "OR", "RA", "RO", "TE", "TI", "AL", "LE", "ME", "SE", "CH", "SH", "TH"],
         3: ["ING", "ESS", "ATI", "ION", "TER", "NES", "TIO", "ATE", "ENT", "OUS", "CON", "FOR", "PRO", "STA", "TRA", "RES", "VER", "ALL", "INT", "AND", "PER", "COM", "EST", "EAR", "STR"],
         4: ["TION", "NESS", "ATIO", "ICAL", "ABLE", "OVER", "TING", "ALLY", "MENT", "ENCE", "ANCE", "PORT", "FORM", "LINE", "RING", "STAR", "HAND", "LAND", "WALL", "BACK"],
         5: ["ATION", "ENESS", "CALLY", "ICALL", "INTER", "TICAL", "GRAPH", "STAND", "LIGHT", "WATER", "ROUND", "PLACE", "HEART", "POINT", "POWER", "WORLD"]
     };
+
+    const loadLocalSubstrings = async () => {
+        for (const url of ["./data/substrings.json", `${apiOrigin}/api/v1/games/word-bomb/substrings`]) {
+            try {
+                const res = await (url.startsWith("./")
+                    ? fetch(url, { cache: "force-cache" })
+                    : window.GamingSession.fetch(url, { cache: "force-cache" }));
+                if (!res.ok) continue;
+                const data = await res.json();
+                if (data && data[2]?.length && data[3]?.length && data[4]?.length && data[5]?.length) {
+                    localSubstrings = data;
+                    return;
+                }
+            } catch (_err) {}
+        }
+    };
+    loadLocalSubstrings();
 
     const chooseLocalSequence = () => {
         const roll = Math.random();
@@ -162,7 +179,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const finalPool = candidates.length > 0 ? candidates : pool;
         const chosen = finalPool[Math.floor(Math.random() * finalPool.length)];
         localSoloRecentSequences.push(chosen);
-        if (localSoloRecentSequences.length > 25) localSoloRecentSequences.shift();
+        if (localSoloRecentSequences.length > 60) localSoloRecentSequences.shift();
         return chosen;
     };
 
@@ -210,8 +227,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             const storage = window.localStorage;
             let maxScore = 0;
 
-            // 1. If logged-in identity is known
+            // 1. If logged-in identity is known, include server-synced high score
             if (identity && !identity.isGuest) {
+                const serverHigh = Number(currentUser?.wordBombHighScore) || 0;
+                if (serverHigh > maxScore) maxScore = serverHigh;
                 const candidates = [
                     identity.id ? storage.getItem(`gaming_universe_wb_solo_high_${identity.id}`) : null,
                     identity.username ? storage.getItem(`gaming_universe_wb_solo_high_${identity.username}`) : null,
@@ -260,12 +279,31 @@ document.addEventListener("DOMContentLoaded", async () => {
         soloHighScoreDisplay.textContent = `${score} ${score === 1 ? "WORD" : "WORDS"}`;
     };
 
+    const syncHighScoreToServer = (score) => {
+        if (!identity || identity.isGuest || !(score > 0)) return;
+        window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/solo-score`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ score })
+        })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+                const serverVal = Number(data?.data?.wordBombHighScore);
+                if (currentUser && serverVal > (Number(currentUser.wordBombHighScore) || 0)) {
+                    currentUser.wordBombHighScore = serverVal;
+                    updateSoloHighScoreDisplay();
+                }
+            })
+            .catch(() => {});
+    };
+
     const recordSoloScore = (count) => {
         try {
             const current = getSoloHighScore();
             if (count > current) {
                 const storage = window.localStorage;
                 if (identity && !identity.isGuest) {
+                    if (currentUser) currentUser.wordBombHighScore = Math.max(Number(currentUser.wordBombHighScore) || 0, count);
                     if (identity.id) storage.setItem(`gaming_universe_wb_solo_high_${identity.id}`, String(count));
                     if (identity.username) storage.setItem(`gaming_universe_wb_solo_high_${identity.username}`, String(count));
                     storage.setItem("gaming_universe_wb_solo_high", String(count));
@@ -448,6 +486,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
 
     const render = (next) => {
+        if (next && next.code && next.mode !== "solo" && next.code !== activeRoomCode) {
+            return;
+        }
         const nextFingerprint = getRoomRenderFingerprint(next);
         if (next && next.code && next.mode !== "solo" && room && nextFingerprint === lastRenderedFingerprint && screenGame?.classList.contains("active")) {
             room = next;
@@ -738,17 +779,18 @@ document.addEventListener("DOMContentLoaded", async () => {
                         const settleRound = room.round;
                         const settleCode = room.code;
                         const settleEpoch = roomEpoch;
-                        pollRoomOnce(settleCode, settleEpoch).then((updated) => {
+                        pollRoomOnce(settleCode, settleEpoch, true).then((updated) => {
                             if (
                                 settleEpoch === roomEpoch &&
+                                activeRoomCode === settleCode &&
                                 room?.code === settleCode &&
                                 room.status === "active" &&
                                 room.round === settleRound &&
                                 (!updated || updated.round === settleRound)
                             ) {
                                 setTimeout(() => {
-                                    if (settleEpoch === roomEpoch && room?.code === settleCode && room.status === "active") {
-                                        pollRoomOnce(settleCode, settleEpoch);
+                                    if (settleEpoch === roomEpoch && activeRoomCode === settleCode && room?.code === settleCode && room.status === "active") {
+                                        pollRoomOnce(settleCode, settleEpoch, true);
                                     }
                                 }, 140);
                             }
@@ -822,14 +864,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     };
 
-    const pollRoomOnce = async (code, expectedEpoch = roomEpoch) => {
+    const pollRoomOnce = async (code, expectedEpoch = roomEpoch, forceSettle = false) => {
         if (!room || room.code !== code || activeRoomCode !== code || room.mode === "solo" || expectedEpoch !== roomEpoch) {
             return null;
         }
-        if (isSubmittingWord || isPollingRoom) return null;
-        isPollingRoom = true;
+        if (!forceSettle && (isSubmittingWord || isPollingRoom)) return null;
+        if (!forceSettle) isPollingRoom = true;
         try {
-            const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/${code}`, { cache: "no-store" });
+            const url = forceSettle
+                ? `${apiOrigin}/api/v1/games/word-bomb/room/${code}?settle=1`
+                : `${apiOrigin}/api/v1/games/word-bomb/room/${code}`;
+            const res = await window.GamingSession.fetch(url, { cache: "no-store" });
             if (expectedEpoch !== roomEpoch || !room || room.code !== code || activeRoomCode !== code) {
                 return null;
             }
@@ -1016,17 +1061,22 @@ document.addEventListener("DOMContentLoaded", async () => {
             }]
         });
 
-        if (identity && !identity.isGuest && myXpEarned > 0) {
+        if (identity && !identity.isGuest && (myXpEarned > 0 || soloCount > 0)) {
             window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/award-xp`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ xpEarned: myXpEarned })
+                body: JSON.stringify({ xpEarned: myXpEarned, soloScore: soloCount })
             })
                 .then((res) => (res.ok ? res.json() : null))
                 .then((data) => {
                     const totalXp = data?.data?.totalXp;
                     if (totalXp !== null && totalXp !== undefined && modalTotalXp && !modal.hidden) {
                         modalTotalXp.textContent = `TOTAL PLATFORM XP: ${totalXp}`;
+                    }
+                    const serverHigh = Number(data?.data?.wordBombHighScore);
+                    if (currentUser && serverHigh > (Number(currentUser.wordBombHighScore) || 0)) {
+                        currentUser.wordBombHighScore = serverHigh;
+                        updateSoloHighScoreDisplay();
                     }
                 })
                 .catch(() => {});
@@ -1126,9 +1176,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         event.preventDefault();
         if (!room || room.status !== "active") return;
         if (isSubmittingWord) return;
-        const word = (input.value || "").trim().toLowerCase();
+        const word = (input.value || "").normalize("NFKC").trim().toLowerCase();
         if (!word) return;
         const submittedRoom = room;
+        const submitEpoch = roomEpoch;
         if (!localSoloActive) {
             const rejectMp = (msg) => {
                 if (feed) feed.textContent = `✕ ${msg}`;
@@ -1155,6 +1206,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
             isSubmittingWord = true;
             input.value = "";
+            if (localDictionarySet && localDictionarySet.has(word)) {
+                clearInterval(timerId);
+                $("word-bomb-center")?.classList.remove("is-urgent", "is-critical");
+                $("word-bomb-visual")?.classList.remove("is-urgent", "is-critical");
+                if (turn) turn.textContent = "✓ ACCEPTED! SWITCHING TURN...";
+            }
         }
 
         if (localSoloActive) {
@@ -1260,6 +1317,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     body: JSON.stringify({ code: room.code, word })
                 });
                 const body = await res.json();
+                if (submitEpoch !== roomEpoch || !activeRoomCode) return;
                 if (res.ok && body.data?.valid) {
                     accepted = true;
                     if (feed) feed.textContent = "";
@@ -1312,6 +1370,11 @@ document.addEventListener("DOMContentLoaded", async () => {
                     username: user.username,
                     isGuest: false
                 };
+                const localBest = getSoloHighScore();
+                const serverBest = Number(user.wordBombHighScore) || 0;
+                if (localBest > serverBest) {
+                    syncHighScoreToServer(localBest);
+                }
                 updateSoloHighScoreDisplay();
             } else {
                 currentUser = null;

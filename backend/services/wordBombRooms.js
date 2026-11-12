@@ -193,8 +193,8 @@ const finishMatch = async (room, winner, reason = "last-player") => {
     await saveRoom(room);
 };
 
-const settleTimeout = async (room) => {
-    if (room.status !== "active" || !room.deadline || Date.now() < room.deadline) {
+const settleTimeout = async (room, graceMs = 0) => {
+    if (room.status !== "active" || !room.deadline || (Date.now() + graceMs) < room.deadline) {
         return false;
     }
 
@@ -369,10 +369,10 @@ const joinRoom = async (actor, code) => {
     return publicRoom(room);
 };
 
-const getRoomState = async (code) => {
+const getRoomState = async (code, graceMs = 0) => {
     const room = await findRoomByCode(code);
     if (!room) return null;
-    await settleTimeout(room);
+    await settleTimeout(room, graceMs);
     return publicRoom(room);
 };
 

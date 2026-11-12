@@ -13,7 +13,7 @@ const requireAuth = async (request, response, next) => {
         }
 
         const user = await User.findById(request.session.userId)
-            .select("_id username email xp favorites")
+            .select("_id username email xp favorites wordBombHighScore")
             .lean();
 
         if (!user) {

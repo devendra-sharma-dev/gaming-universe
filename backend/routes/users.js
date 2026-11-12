@@ -13,7 +13,8 @@ router.get("/me", requireAuth, (request, response) => {
             username: request.user.username,
             email: request.user.email,
             xp: request.user.xp,
-            favorites: request.user.favorites
+            favorites: request.user.favorites,
+            wordBombHighScore: request.user.wordBombHighScore || 0
         }
     });
 });

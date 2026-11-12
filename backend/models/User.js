@@ -52,6 +52,12 @@ const userSchema = new mongoose.Schema(
             min: 0
         },
 
+        wordBombHighScore: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+
         favorites: {
             type: [mongoose.Schema.Types.Mixed],
             default: []
