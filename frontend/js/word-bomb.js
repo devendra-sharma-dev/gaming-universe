@@ -779,22 +779,31 @@ document.addEventListener("DOMContentLoaded", async () => {
                         const settleRound = room.round;
                         const settleCode = room.code;
                         const settleEpoch = roomEpoch;
-                        pollRoomOnce(settleCode, settleEpoch, true).then((updated) => {
+                        const runSettleRetry = () => {
                             if (
-                                settleEpoch === roomEpoch &&
-                                activeRoomCode === settleCode &&
-                                room?.code === settleCode &&
-                                room.status === "active" &&
-                                room.round === settleRound &&
-                                (!updated || updated.round === settleRound)
+                                settleEpoch !== roomEpoch ||
+                                activeRoomCode !== settleCode ||
+                                !room ||
+                                room.code !== settleCode ||
+                                room.status !== "active" ||
+                                room.round !== settleRound
                             ) {
-                                setTimeout(() => {
-                                    if (settleEpoch === roomEpoch && activeRoomCode === settleCode && room?.code === settleCode && room.status === "active") {
-                                        pollRoomOnce(settleCode, settleEpoch, true);
-                                    }
-                                }, 140);
+                                return;
                             }
-                        });
+                            pollRoomOnce(settleCode, settleEpoch, true).then((updated) => {
+                                if (
+                                    settleEpoch === roomEpoch &&
+                                    activeRoomCode === settleCode &&
+                                    room?.code === settleCode &&
+                                    room.status === "active" &&
+                                    room.round === settleRound &&
+                                    (!updated || updated.round === settleRound)
+                                ) {
+                                    setTimeout(runSettleRetry, 250);
+                                }
+                            });
+                        };
+                        runSettleRetry();
                     }
                 }
             }, 100);
@@ -870,11 +879,18 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         if (!forceSettle && (isSubmittingWord || isPollingRoom)) return null;
         if (!forceSettle) isPollingRoom = true;
+        const controller = typeof AbortController === "function" ? new AbortController() : null;
+        const timeoutHandle = controller ? setTimeout(() => controller.abort(), 5000) : null;
         try {
-            const url = forceSettle
-                ? `${apiOrigin}/api/v1/games/word-bomb/room/${code}?settle=1`
-                : `${apiOrigin}/api/v1/games/word-bomb/room/${code}`;
-            const res = await window.GamingSession.fetch(url, { cache: "no-store" });
+            const params = new URLSearchParams();
+            if (forceSettle) params.set("settle", "1");
+            if (identity?.id) params.set("pid", identity.id);
+            const qs = params.toString();
+            const url = `${apiOrigin}/api/v1/games/word-bomb/room/${code}${qs ? `?${qs}` : ""}`;
+            const res = await window.GamingSession.fetch(url, {
+                cache: "no-store",
+                signal: controller?.signal
+            });
             if (expectedEpoch !== roomEpoch || !room || room.code !== code || activeRoomCode !== code) {
                 return null;
             }
@@ -889,9 +905,12 @@ document.addEventListener("DOMContentLoaded", async () => {
                     render(nextRoom);
                     return nextRoom;
                 }
+            } else if (res.status === 404) {
+                leaveActiveRoom();
             }
         } catch (_e) {} finally {
-            isPollingRoom = false;
+            if (timeoutHandle) clearTimeout(timeoutHandle);
+            if (!forceSettle) isPollingRoom = false;
         }
         return null;
     };
@@ -1166,6 +1185,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Leave button: Immediately leaves room cleanly with NO browser confirm/toast dialog!
     exitBtn?.addEventListener("click", leaveActiveRoom);
 
+    // Ensure closing browser/tab disconnects player from active lobby or match
+    const handlePageExit = () => {
+        const leavingCode = room?.code || activeRoomCode;
+        if (!leavingCode) return;
+        window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/leave`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code: leavingCode }),
+            keepalive: true
+        }).catch(() => {});
+    };
+    window.addEventListener("pagehide", handlePageExit);
+    window.addEventListener("beforeunload", handlePageExit);
+
     // Clear error message when user starts typing a new word
     input?.addEventListener("input", () => {
         if (feed) feed.textContent = "";
@@ -1206,11 +1239,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
             isSubmittingWord = true;
             input.value = "";
-            if (localDictionarySet && localDictionarySet.has(word)) {
-                clearInterval(timerId);
-                $("word-bomb-center")?.classList.remove("is-urgent", "is-critical");
-                $("word-bomb-visual")?.classList.remove("is-urgent", "is-critical");
-                if (turn) turn.textContent = "✓ ACCEPTED! SWITCHING TURN...";
+            if (localDictionarySet && localDictionarySet.has(word) && feed) {
+                feed.textContent = "✓ Sending word...";
             }
         }
 
@@ -1310,11 +1340,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (feed) feed.textContent = "";
         if (room?.code) {
             let accepted = false;
+            const submitController = typeof AbortController === "function" ? new AbortController() : null;
+            const submitTimeout = submitController ? setTimeout(() => submitController.abort(), 8000) : null;
             try {
                 const res = await window.GamingSession.fetch(`${apiOrigin}/api/v1/games/word-bomb/room/submit`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ code: room.code, word })
+                    body: JSON.stringify({ code: room.code, word }),
+                    signal: submitController?.signal
                 });
                 const body = await res.json();
                 if (submitEpoch !== roomEpoch || !activeRoomCode) return;
@@ -1341,6 +1374,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             } catch (_e) {
                 if (feed) feed.textContent = "✕ Network error submitting word. Please retry.";
             } finally {
+                if (submitTimeout) clearTimeout(submitTimeout);
                 isSubmittingWord = false;
             }
             if (!accepted && room === submittedRoom && room.status === "active" && !input.value) {

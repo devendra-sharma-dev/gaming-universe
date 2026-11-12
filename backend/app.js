@@ -57,7 +57,10 @@ const STATELESS_SESSION_PATHS = new Set([
 ]);
 
 app.use((request, response, next) => {
-    if (STATELESS_SESSION_PATHS.has(request.path)) {
+    if (
+        STATELESS_SESSION_PATHS.has(request.path) ||
+        (request.method === "GET" && request.path.startsWith("/api/v1/games/word-bomb/room/"))
+    ) {
         return next();
     }
     return sessionMiddleware(request, response, next);

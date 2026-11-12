@@ -177,7 +177,10 @@ router.get(
         response.setHeader("Cache-Control", "no-store");
         const code = String(request.params?.code || "").trim().toUpperCase();
         const graceMs = request.query?.settle === "1" ? 250 : 0;
-        const room = await wordBombRooms.getRoomState(code, graceMs);
+        const viewerId = typeof request.query?.pid === "string" && request.query.pid.trim()
+            ? request.query.pid.trim()
+            : null;
+        const room = await wordBombRooms.getRoomState(code, graceMs, viewerId);
         if (!room) {
             return response.status(404).json({ success: false, error: { message: "Room not found." } });
         }
