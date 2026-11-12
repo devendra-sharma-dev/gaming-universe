@@ -10,6 +10,7 @@ const { hasWord } = require("./wordnikDictionary");
 const TURN_MS = 20000;
 const MAX_PLAYERS = 6;
 const START_LIVES = 3;
+const DISCONNECT_MS = 25000;
 
 // Load substring pool
 let substringPools = {
@@ -199,7 +200,7 @@ const settleTimeout = async (room, graceMs = 0) => {
     }
 
     const player = room.players[room.turnIndex];
-    if (!player || player.eliminated) return false;
+    if (!player || player.eliminated || player.left) return false;
 
     if (!Array.isArray(room.sequenceFailedIds)) room.sequenceFailedIds = [];
     if (!room.sequenceFailedIds.includes(player.id)) {
@@ -213,7 +214,7 @@ const settleTimeout = async (room, graceMs = 0) => {
         player.eliminatedOrder = room.eliminatedCount;
     }
 
-    const alive = room.players.filter((p) => !p.eliminated);
+    const alive = room.players.filter((p) => !p.eliminated && !p.left);
     if (alive.length <= 1) {
         await finishMatch(room, alive[0] || null, "last-player");
         return true;
@@ -221,7 +222,7 @@ const settleTimeout = async (room, graceMs = 0) => {
 
     // Advance turn
     let nextIdx = (room.turnIndex + 1) % room.players.length;
-    while (room.players[nextIdx].eliminated) {
+    while (room.players[nextIdx].eliminated || room.players[nextIdx].left) {
         nextIdx = (nextIdx + 1) % room.players.length;
     }
     room.turnIndex = nextIdx;
@@ -322,6 +323,8 @@ const createRoom = async (actor, isPublic = true) => {
             username: actor.username,
             lives: START_LIVES,
             eliminated: false,
+            left: false,
+            lastSeenAt: Date.now(),
             eliminatedOrder: 0,
             isGuest: Boolean(actor.isGuest),
             alphabetUsed: [],
@@ -357,6 +360,8 @@ const joinRoom = async (actor, code) => {
             username: actor.username,
             lives: START_LIVES,
             eliminated: false,
+            left: false,
+            lastSeenAt: Date.now(),
             eliminatedOrder: 0,
             isGuest: Boolean(actor.isGuest),
             alphabetUsed: [],
@@ -364,14 +369,92 @@ const joinRoom = async (actor, code) => {
             streak: 0
         });
         await saveRoom(room);
+    } else {
+        existing.left = false;
+        existing.lastSeenAt = Date.now();
+        await saveRoom(room);
     }
 
     return publicRoom(room);
 };
 
-const getRoomState = async (code, graceMs = 0) => {
+const pruneDisconnectedPlayers = async (room, viewerId = null) => {
+    const now = Date.now();
+    let changed = false;
+    let shouldPersistHeartbeat = false;
+
+    if (viewerId) {
+        const viewer = room.players.find((p) => p.id === viewerId);
+        if (viewer && !viewer.left) {
+            shouldPersistHeartbeat = !viewer.lastSeenAt || (now - viewer.lastSeenAt >= 5000);
+            viewer.lastSeenAt = now;
+        }
+    }
+
+    if (room.status === "lobby") {
+        const before = room.players.length;
+        room.players = room.players.filter(
+            (p) => !p.left && (!p.lastSeenAt || now - p.lastSeenAt <= DISCONNECT_MS)
+        );
+        if (room.players.length !== before) {
+            changed = true;
+            if (room.players.length === 0) {
+                await deleteRoom(room.code);
+                return { deleted: true, changed: true };
+            }
+            if (!room.players.some((p) => p.id === room.hostId)) {
+                room.hostId = room.players[0].id;
+            }
+        }
+    } else if (room.status === "active") {
+        for (const p of room.players) {
+            if (!p.eliminated && !p.left && p.lastSeenAt && (now - p.lastSeenAt > DISCONNECT_MS)) {
+                p.left = true;
+                p.eliminated = true;
+                p.lives = 0;
+                room.eliminatedCount = (room.eliminatedCount || 0) + 1;
+                p.eliminatedOrder = room.eliminatedCount;
+                changed = true;
+            }
+        }
+        if (changed) {
+            const alive = room.players.filter((p) => !p.eliminated && !p.left);
+            if (alive.length <= 1) {
+                await finishMatch(room, alive[0] || null, "abandoned");
+                return { deleted: false, changed: true };
+            }
+            const curr = room.players[room.turnIndex];
+            if (!curr || curr.eliminated || curr.left) {
+                let nextIdx = (room.turnIndex + 1) % room.players.length;
+                while (room.players[nextIdx].eliminated || room.players[nextIdx].left) {
+                    nextIdx = (nextIdx + 1) % room.players.length;
+                }
+                room.turnIndex = nextIdx;
+                room.round = (room.round || 1) + 1;
+                room.deadline = Date.now() + TURN_MS;
+            }
+        }
+    }
+
+    if (changed) {
+        await saveRoom(room);
+    } else if (shouldPersistHeartbeat && viewerId) {
+        const col = getRoomsCollection();
+        if (col && room._id) {
+            await col.updateOne(
+                { _id: room._id, "players.id": viewerId },
+                { ["$set"]: { ["players.$.lastSeenAt"]: now } }
+            );
+        }
+    }
+    return { deleted: false, changed };
+};
+
+const getRoomState = async (code, graceMs = 0, viewerId = null) => {
     const room = await findRoomByCode(code);
     if (!room) return null;
+    const { deleted } = await pruneDisconnectedPlayers(room, viewerId);
+    if (deleted) return null;
     await settleTimeout(room, graceMs);
     return publicRoom(room);
 };
@@ -433,6 +516,14 @@ const rematchRoom = async (actor, code) => {
     const isHost = room.hostId === actor.id || room.players[0]?.id === actor.id;
     if (!isHost) throw new Error("Only the host can restart the room.");
 
+    // Remove players who left or disconnected so they are never dragged back into a replayed lobby
+    const now = Date.now();
+    room.players = room.players.filter(
+        (p) => !p.left && (p.id === actor.id || !p.lastSeenAt || now - p.lastSeenAt <= DISCONNECT_MS)
+    );
+    const hostPlayer = room.players.find((p) => p.id === actor.id);
+    if (hostPlayer) hostPlayer.lastSeenAt = now;
+
     // Keep room._id unchanged so replaceOne updates the existing room document in-place
     room.matchId = crypto.randomUUID();
     room.status = "lobby";
@@ -450,6 +541,7 @@ const rematchRoom = async (actor, code) => {
     room.expiresAt = new Date(Date.now() + 86400000);
     for (const p of room.players) {
         p.eliminated = false;
+        p.left = false;
         p.eliminatedOrder = 0;
         p.lives = START_LIVES;
         p.alphabetUsed = [];
@@ -480,6 +572,7 @@ const submitWord = async (actor, code, rawWord) => {
     if (!currentTurnPlayer || currentTurnPlayer.id !== actor.id) {
         throw new Error("Wait for your turn.");
     }
+    currentTurnPlayer.lastSeenAt = Date.now();
 
     const clean = String(rawWord || "").normalize("NFKC").trim().toLowerCase();
     const seq = String(room.sequence || "").toLowerCase();
@@ -511,7 +604,7 @@ const submitWord = async (actor, code, rawWord) => {
 
     // Next turn
     let nextIdx = (room.turnIndex + 1) % room.players.length;
-    while (room.players[nextIdx].eliminated) {
+    while (room.players[nextIdx].eliminated || room.players[nextIdx].left) {
         nextIdx = (nextIdx + 1) % room.players.length;
     }
     room.turnIndex = nextIdx;
@@ -545,25 +638,46 @@ const leaveRoom = async (actor, code) => {
     } else if (room.status === "active") {
         const player = room.players.find((p) => p.id === actor.id);
         if (player) {
+            player.left = true;
             player.eliminated = true;
             player.lives = 0;
+            room.eliminatedCount = (room.eliminatedCount || 0) + 1;
+            player.eliminatedOrder = room.eliminatedCount;
         }
-        const alive = room.players.filter((p) => !p.eliminated);
+        const alive = room.players.filter((p) => !p.eliminated && !p.left);
         if (alive.length <= 1) {
             await finishMatch(room, alive[0] || null, "abandoned");
-        } else if (room.players[room.turnIndex]?.id === actor.id) {
-            let nextIdx = (room.turnIndex + 1) % room.players.length;
-            while (room.players[nextIdx].eliminated) {
-                nextIdx = (nextIdx + 1) % room.players.length;
+        } else {
+            if (room.players[room.turnIndex]?.id === actor.id) {
+                let nextIdx = (room.turnIndex + 1) % room.players.length;
+                while (room.players[nextIdx].eliminated || room.players[nextIdx].left) {
+                    nextIdx = (room.turnIndex + 1) % room.players.length;
+                }
+                room.turnIndex = nextIdx;
+                room.round = (room.round || 1) + 1;
+                room.sequence = chooseSequence(room.recentSequences || []);
+                room.sequenceFailedIds = [];
+                room.sequenceStartPlayerId = room.players[nextIdx]?.id || null;
+                room.deadline = Date.now() + TURN_MS;
             }
-            room.turnIndex = nextIdx;
-            room.sequence = chooseSequence(room.recentSequences || []);
-            room.deadline = Date.now() + TURN_MS;
+            await saveRoom(room);
+        }
+    } else if (room.status === "finished") {
+        const player = room.players.find((p) => p.id === actor.id);
+        if (player) {
+            player.left = true;
+            if (room.hostId === actor.id) {
+                const remaining = room.players.find((p) => !p.left);
+                if (remaining) room.hostId = remaining.id;
+            }
+            if (room.players.every((p) => p.left)) {
+                await deleteRoom(code);
+                return;
+            }
             await saveRoom(room);
         }
     }
 };
-
 module.exports = {
     getActiveLobbies,
     createRoom,
