@@ -497,18 +497,25 @@
    ───────────────────────────────────────────────────────────── */
 .game-status-bar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   margin-bottom: 12px;
+  max-width: 100%;
 }
 .game-status-bar .exit-btn {
   padding: 10px 18px;
   font-size: 12px;
   letter-spacing: 0.1em;
+  flex-shrink: 0;
 }
 .game-status-info {
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 100%;
 }
 .visibility-badge, .room-badge, .round-badge {
   background: rgba(255, 255, 255, 0.08);
@@ -1350,7 +1357,24 @@
 @media(max-width: 850px) {
   .word-bomb-shell {
     width: calc(100% - 28px);
+    max-width: 100%;
+    overflow-x: hidden;
     margin-top: 100px;
+  }
+  .game-status-bar {
+    gap: 8px;
+  }
+  .game-status-bar .exit-btn {
+    padding: 8px 12px;
+    font-size: 11px;
+  }
+  .game-status-info {
+    gap: 6px;
+  }
+  .visibility-badge, .room-badge, .round-badge {
+    padding: 5px 10px;
+    font-size: 11px;
+    white-space: nowrap;
   }
   .wb-hero-banner {
     max-height: 320px;

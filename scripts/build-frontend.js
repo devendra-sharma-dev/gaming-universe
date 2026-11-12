@@ -23,6 +23,13 @@ if (fs.existsSync(dictionarySrc)) {
     fs.copyFileSync(dictionarySrc, path.join(dataDir, "dictionary.txt"));
 }
 
+const substringsSrc = path.join(root, "data", "wordBombSubstrings.json");
+if (fs.existsSync(substringsSrc)) {
+    const dataDir = path.join(output, "data");
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.copyFileSync(substringsSrc, path.join(dataDir, "substrings.json"));
+}
+
 const sessionPath = path.join(output, "js", "session.js");
 const sessionSource = fs.readFileSync(path.join(root, "frontend", "js", "session.js"), "utf8");
 fs.writeFileSync(sessionPath,
